@@ -1,4 +1,3 @@
-
 import { GameCard } from './GameCard'
 import { Gamepad2, Zap, Target, Puzzle, Trophy, Sparkles, Users, Bitcoin, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,6 +8,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel"
+import Autoplay from "embla-carousel-autoplay"
 
 const games = [
   {
@@ -70,33 +70,20 @@ export function Dashboard({ onPlayClick }: DashboardProps) {
         </Button>
       </div>
 
-      {/* Value Props */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-12 md:mb-16 animate-fade-in" style={{ animationDelay: '200ms' }}>
-        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
-          <Users className="w-10 h-10 text-teal mx-auto mb-3" />
-          <p className="text-lg font-bold text-deep-sea">Challenge Friends</p>
-          <p className="text-sm text-steel-blue">Compete 1-on-1</p>
-        </div>
-        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
-          <Bitcoin className="w-10 h-10 text-gold mx-auto mb-3" />
-          <p className="text-lg font-bold text-deep-sea">Win Sats</p>
-          <p className="text-sm text-steel-blue">Real Bitcoin rewards</p>
-        </div>
-        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
-          <Globe className="w-10 h-10 text-steel-blue mx-auto mb-3" />
-          <p className="text-lg font-bold text-deep-sea">Global Leaderboards</p>
-          <p className="text-sm text-steel-blue">Prove you're the best</p>
-        </div>
-      </div>
-      
       {/* Games Preview */}
-      <div className="animate-fade-in mb-12 md:mb-16" style={{ animationDelay: '400ms' }}>
+      <div className="animate-fade-in mb-12 md:mb-16" style={{ animationDelay: '200ms' }}>
         <h2 className="text-3xl md:text-4xl font-bold text-deep-sea mb-6 text-center tracking-tight">Choose Your Battle</h2>
         <Carousel
           opts={{
             align: "center",
             loop: true,
           }}
+          plugins={[
+            Autoplay({
+              delay: 4000,
+              stopOnInteraction: true,
+            }),
+          ]}
           className="w-full"
         >
           <CarouselContent className="-ml-4">
@@ -119,7 +106,26 @@ export function Dashboard({ onPlayClick }: DashboardProps) {
           <CarouselNext className="text-deep-sea bg-white/80 hover:bg-white border-gray-200 shadow-md -right-4 disabled:opacity-50" />
         </Carousel>
       </div>
-
+      
+      {/* Value Props */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-12 md:mb-16 animate-fade-in" style={{ animationDelay: '400ms' }}>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Users className="w-10 h-10 text-teal mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Challenge Friends</p>
+          <p className="text-sm text-steel-blue">Compete 1-on-1</p>
+        </div>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Bitcoin className="w-10 h-10 text-gold mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Win Sats</p>
+          <p className="text-sm text-steel-blue">Real Bitcoin rewards</p>
+        </div>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Globe className="w-10 h-10 text-steel-blue mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Global Leaderboards</p>
+          <p className="text-sm text-steel-blue">Prove you're the best</p>
+        </div>
+      </div>
+      
       {/* CTA Section */}
       <div className="text-center animate-fade-in" style={{ animationDelay: '600ms' }}>
         <div className="bg-gradient-to-br from-deep-sea to-steel-blue text-white p-8 md:p-10 rounded-3xl shadow-xl relative overflow-hidden">
