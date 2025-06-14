@@ -1,6 +1,12 @@
-
 import { GameCard } from './GameCard'
 import { Gamepad2, Zap, Target, Puzzle, Trophy } from 'lucide-react'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 
 const games = [
   {
@@ -42,34 +48,53 @@ const games = [
 
 export function Dashboard() {
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">Gaming Dashboard</h1>
-        <p className="text-gray-300 text-lg">Choose your adventure in the Nostr gaming ecosystem</p>
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="mb-12 text-center animate-fade-in">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight mb-4">
+          Nostr Game Center
+        </h1>
+        <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+          Your portal to a new era of decentralized gaming. Compete, earn, and own your progress.
+        </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {games.map((game, index) => (
-          <GameCard
-            key={index}
-            title={game.title}
-            description={game.description}
-            icon={game.icon}
-            status={game.status}
-            gradient={game.gradient}
-            onClick={() => {
-              console.log(`${game.title} clicked - minigame will be implemented here`)
-            }}
-          />
-        ))}
+      <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+        <Carousel
+          opts={{
+            align: "start",
+            loop: true,
+          }}
+          className="w-full"
+        >
+          <CarouselContent className="-ml-4">
+            {games.map((game, index) => (
+              <CarouselItem key={index} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                <div className="p-1">
+                  <GameCard
+                    title={game.title}
+                    description={game.description}
+                    icon={game.icon}
+                    status={game.status}
+                    gradient={game.gradient}
+                    onClick={() => {
+                      console.log(`${game.title} clicked - minigame will be implemented here`)
+                    }}
+                  />
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious className="text-white bg-white/10 hover:bg-white/20 border-white/20 -left-4 sm:-left-8" />
+          <CarouselNext className="text-white bg-white/10 hover:bg-white/20 border-white/20 -right-4 sm:-right-8" />
+        </Carousel>
       </div>
-      
-      <div className="mt-12 text-center">
-        <div className="bg-white/5 backdrop-blur-lg rounded-lg p-6 border border-purple-500/20">
-          <h3 className="text-xl font-semibold text-white mb-2">More Games Coming Soon!</h3>
-          <p className="text-gray-300">
-            We're constantly adding new minigames to the platform. 
-            Stay tuned for exciting updates and new ways to earn and play.
+
+      <div className="mt-16 text-center animate-fade-in" style={{ animationDelay: '400ms' }}>
+        <div className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 shadow-lg shadow-purple-500/10 rounded-xl p-8 max-w-3xl mx-auto">
+          <h3 className="text-2xl font-bold text-white mb-3">The Future is Fun</h3>
+          <p className="text-gray-400">
+            We are building a vibrant ecosystem of games on Nostr.
+            New titles and features are released regularly. Stay tuned!
           </p>
         </div>
       </div>

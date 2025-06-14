@@ -98,31 +98,41 @@ export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-black/20 backdrop-blur-lg border-purple-500/20">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4">
-            <Zap className="w-10 h-10 text-white" />
-          </div>
-          <CardTitle className="text-2xl font-bold text-white">Nostr Gaming Hub</CardTitle>
-          <CardDescription className="text-gray-300">
-            Connect your Nostr identity to access exclusive minigames
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            onClick={launchLogin}
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
-          >
-            <User className="w-5 h-5 mr-2" />
-            {isLoading ? 'Connecting...' : 'Connect with Nostr'}
-          </Button>
-          <p className="text-xs text-gray-400 text-center">
-            Secure login with your Nostr keys or extension
-          </p>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-sm">
+        <Card className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 shadow-2xl shadow-purple-500/10 animate-fade-in">
+          <CardHeader className="items-center text-center p-8">
+            <div className="p-4 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-6">
+              <Zap size={40} className="text-white" />
+            </div>
+            <CardTitle className="text-3xl font-bold tracking-tight">
+              Welcome to Nostr Gaming
+            </CardTitle>
+            <CardDescription className="text-gray-400 max-w-xs mx-auto pt-2">
+              Unlock a world of decentralized games. Connect securely with your Nostr identity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-8 pb-8">
+            <Button
+              onClick={launchLogin}
+              disabled={isLoading}
+              className="w-full text-lg py-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-600/20"
+            >
+              {isLoading ? (
+                'Connecting...'
+              ) : (
+                <>
+                  <User className="mr-2 h-5 w-5" />
+                  Connect with Nostr
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-gray-500 text-center mt-4">
+              Uses NIP-07 browser extension or NIP-46 remote signing.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
