@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
 import { Profile } from '@/components/Profile'
+import { GameHub } from '@/pages/GameHub'
 import { getProfileFromPubkey } from "@/lib/nostr";
 import { useNostrSupabaseLogin, type SupabaseUser } from "@/hooks/useNostrSupabaseLogin"
 
@@ -18,7 +18,7 @@ declare global {
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [pubkey, setPubkey] = useState<string>('')
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile' | 'gamehub'>('dashboard')
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [wasLoggedInBefore, setWasLoggedInBefore] = useState(false);
@@ -94,6 +94,7 @@ export default function Index() {
   const handleLogin = async (userPubkey: string, closeModal = true) => {
     setPubkey(userPubkey);
     setIsLoggedIn(true);
+    setCurrentPage('gamehub'); // Navigate to GameHub after login
     console.log("User logged in with pubkey:", userPubkey);
     const nostrProfile = await getProfileFromPubkey(userPubkey);
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
@@ -103,6 +104,7 @@ export default function Index() {
   const handleSignup = async (userPubkey: string) => {
     setPubkey(userPubkey);
     setIsLoggedIn(true);
+    setCurrentPage('gamehub'); // Navigate to GameHub after signup
     setProfileReloadKey((prev) => prev + 1);
     console.log("User signed up with pubkey:", userPubkey, "Profile will be reloaded");
     const nostrProfile = await getProfileFromPubkey(userPubkey);
@@ -122,8 +124,8 @@ export default function Index() {
     console.log('User logged out')
   }
 
-  const handleNavigate = (page: 'dashboard' | 'profile') => {
-    if (page === 'profile' && !isLoggedIn) {
+  const handleNavigate = (page: 'dashboard' | 'profile' | 'gamehub') => {
+    if ((page === 'profile' || page === 'gamehub') && !isLoggedIn) {
       launchNostrLoginForm()
     } else {
       setCurrentPage(page)
@@ -145,23 +147,48 @@ export default function Index() {
     document.dispatchEvent(new CustomEvent('nlLaunch', { detail: startScreen }));
   }
 
+  const renderCurrentPage = () => {
+    if (!isLoggedIn) {
+      // Show dashboard for non-logged-in users
+      return <Dashboard onPlayClick={handlePlayClick} />;
+    }
+
+    // Show appropriate page for logged-in users
+    switch (currentPage) {
+      case 'profile':
+        return <Profile pubkey={pubkey} key={profileReloadKey} />;
+      case 'gamehub':
+        return (
+          <GameHub 
+            onLogout={handleLogout}
+            onNavigateToProfile={() => setCurrentPage('profile')}
+          />
+        );
+      default:
+        return (
+          <GameHub 
+            onLogout={handleLogout}
+            onNavigateToProfile={() => setCurrentPage('profile')}
+          />
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-deep-sea">
-      <Navbar
-        isLoggedIn={isLoggedIn}
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-        onLoginClick={launchNostrLoginForm}
-        pubkey={pubkey}
-      />
+      {!isLoggedIn && (
+        <Navbar
+          isLoggedIn={isLoggedIn}
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          onLoginClick={launchNostrLoginForm}
+          pubkey={pubkey}
+        />
+      )}
       
-      <main className="pt-4">
-        {currentPage === 'dashboard' ? (
-          <Dashboard onPlayClick={handlePlayClick} />
-        ) : (
-          <Profile pubkey={pubkey} key={profileReloadKey} />
-        )}
+      <main className={!isLoggedIn ? "pt-4" : ""}>
+        {renderCurrentPage()}
       </main>
     </div>
   )
