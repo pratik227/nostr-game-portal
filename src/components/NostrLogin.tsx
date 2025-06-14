@@ -35,6 +35,7 @@ export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
     script.setAttribute('data-perms', 'sign_event:1,sign_event:0')
     script.setAttribute('data-title', 'Nostr Gaming Hub')
     script.setAttribute('data-description', 'Connect your Nostr identity to access minigames')
+    script.setAttribute('data-no-banner', 'true') // Disable the nostr-login banner
     script.onload = () => {
       setNostrLoginReady(true)
     }
