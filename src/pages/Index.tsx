@@ -1,13 +1,12 @@
+
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
 import { Profile } from '@/components/Profile'
-import { LoginModal } from '@/components/LoginModal'
 import { getProfileFromPubkey } from "@/lib/nostr";
 import { useNostrSupabaseLogin, type SupabaseUser } from "@/hooks/useNostrSupabaseLogin"
 
 // This declaration is needed to inform TypeScript about the nostr object
-// that might be injected into the window by browser extensions like Alby or GetSimple.
 declare global {
   interface Window {
     nostr?: {
@@ -21,7 +20,6 @@ export default function Index() {
   const [pubkey, setPubkey] = useState<string>('')
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
   const [profileReloadKey, setProfileReloadKey] = useState(0)
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const { loginOrSignup, isProcessing, error } = useNostrSupabaseLogin();
 
@@ -32,7 +30,7 @@ export default function Index() {
         if (window.nostr) {
           const pk = await window.nostr.getPublicKey()
           if (pk) {
-            handleLogin(pk, false) // handle login without closing modal
+            handleLogin(pk, false)
           }
         }
       } catch (error) {
@@ -70,8 +68,7 @@ export default function Index() {
     }
     document.addEventListener('nlAuth', handleAuth)
     
-    // Also listen to nostr-login's own logout event
-    const handleNLLogout = () => handleLogout(false) // Don't re-dispatch event
+    const handleNLLogout = () => handleLogout(false)
     document.addEventListener('nlLogout', handleNLLogout)
 
     return () => {
@@ -86,13 +83,8 @@ export default function Index() {
   const handleLogin = async (userPubkey: string, closeModal = true) => {
     setPubkey(userPubkey);
     setIsLoggedIn(true);
-    if (closeModal) setShowLoginModal(false);
     console.log("User logged in with pubkey:", userPubkey);
-
-    // 1. Fetch Nostr profile
     const nostrProfile = await getProfileFromPubkey(userPubkey);
-
-    // 2. Call Supabase loginOrSignup to check/insert user
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
     setSupabaseUser(user);
   };
@@ -100,14 +92,9 @@ export default function Index() {
   const handleSignup = async (userPubkey: string) => {
     setPubkey(userPubkey);
     setIsLoggedIn(true);
-    setShowLoginModal(false);
     setProfileReloadKey((prev) => prev + 1);
     console.log("User signed up with pubkey:", userPubkey, "Profile will be reloaded");
-
-    // 1. Fetch Nostr profile for new user
     const nostrProfile = await getProfileFromPubkey(userPubkey);
-
-    // 2. Call Supabase loginOrSignup to create user
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
     setSupabaseUser(user);
   };
@@ -125,7 +112,7 @@ export default function Index() {
 
   const handleNavigate = (page: 'dashboard' | 'profile') => {
     if (page === 'profile' && !isLoggedIn) {
-      setShowLoginModal(true)
+      launchNostrLoginForm()
     } else {
       setCurrentPage(page)
     }
@@ -133,11 +120,15 @@ export default function Index() {
 
   const handlePlayClick = () => {
     if (!isLoggedIn) {
-      setShowLoginModal(true);
+      launchNostrLoginForm()
     } else {
       console.log("User is logged in. Ready to play!");
-      // Here you would navigate to the actual game screen
     }
+  }
+
+  // New: launch NostrLogin form (dispatch event)
+  const launchNostrLoginForm = () => {
+    document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
   }
 
   return (
@@ -147,7 +138,7 @@ export default function Index() {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
-        onLoginClick={() => setShowLoginModal(true)}
+        onLoginClick={launchNostrLoginForm}
         pubkey={pubkey}
       />
       
@@ -158,12 +149,7 @@ export default function Index() {
           <Profile pubkey={pubkey} key={profileReloadKey} />
         )}
       </main>
-
-      <LoginModal 
-        open={showLoginModal} 
-        onOpenChange={setShowLoginModal}
-        onLaunchNostrLogin={() => document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }))}
-      />
+      {/* LoginModal removed */}
     </div>
   )
 }
