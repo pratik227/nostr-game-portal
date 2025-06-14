@@ -47,50 +47,51 @@ interface DashboardProps {
 
 export function Dashboard({ onPlayClick }: DashboardProps) {
   return (
-    <div className="max-w-md mx-auto p-4 pb-8">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
       {/* Hero Section */}
-      <div className="text-center mb-8 animate-fade-in">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-gold to-yellow-400 rounded-3xl mb-4 shadow-2xl">
-          <Sparkles className="w-10 h-10 text-deep-sea" />
+      <div className="text-center mb-12 md:mb-16 animate-fade-in">
+        <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-gold to-yellow-400 rounded-full mb-6 shadow-2xl ring-4 ring-gold/20">
+          <Sparkles className="w-12 h-12 text-deep-sea" />
         </div>
-        <h1 className="text-3xl font-black text-deep-sea mb-2 tracking-tight">
-          Ready to Win?
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-deep-sea mb-4 tracking-tighter">
+          Ready to Win Sats?
         </h1>
-        <p className="text-steel-blue text-sm leading-relaxed mb-6">
-          Challenge friends • Earn sats • Dominate leaderboards
+        <p className="max-w-2xl mx-auto text-steel-blue text-base md:text-lg leading-relaxed mb-8">
+          Challenge friends, earn sats, and dominate the leaderboards in our skill-based games.
         </p>
         
         <Button
           onClick={onPlayClick}
-          className="w-full h-14 text-lg font-bold bg-gradient-to-r from-gold to-yellow-400 hover:from-gold/90 hover:to-yellow-400/90 text-deep-sea rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-200"
+          size="lg"
+          className="w-full sm:w-auto h-16 text-xl font-bold bg-gradient-to-r from-gold to-yellow-400 hover:from-gold/90 hover:to-yellow-400/90 text-deep-sea rounded-2xl shadow-xl hover:shadow-2xl transform hover:scale-[1.03] transition-all duration-300 ease-in-out px-10"
         >
-          <Gamepad2 className="w-6 h-6 mr-3" />
+          <Gamepad2 className="w-8 h-8 mr-3" />
           Start Playing Now
         </Button>
       </div>
 
       {/* Value Props */}
-      <div className="grid grid-cols-3 gap-3 mb-8 animate-fade-in" style={{ animationDelay: '200ms' }}>
-        <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl">
-          <Users className="w-8 h-8 text-teal mx-auto mb-2" />
-          <p className="text-xs font-bold text-deep-sea">Challenge</p>
-          <p className="text-xs text-steel-blue">Friends</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-12 md:mb-16 animate-fade-in" style={{ animationDelay: '200ms' }}>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Users className="w-10 h-10 text-teal mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Challenge Friends</p>
+          <p className="text-sm text-steel-blue">Compete 1-on-1</p>
         </div>
-        <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl">
-          <Bitcoin className="w-8 h-8 text-gold mx-auto mb-2" />
-          <p className="text-xs font-bold text-deep-sea">Win</p>
-          <p className="text-xs text-steel-blue">Sats</p>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Bitcoin className="w-10 h-10 text-gold mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Win Sats</p>
+          <p className="text-sm text-steel-blue">Real Bitcoin rewards</p>
         </div>
-        <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl">
-          <Globe className="w-8 h-8 text-steel-blue mx-auto mb-2" />
-          <p className="text-xs font-bold text-deep-sea">Global</p>
-          <p className="text-xs text-steel-blue">Compete</p>
+        <div className="text-center p-6 bg-white/60 backdrop-blur-sm rounded-3xl border border-gray-200/50 shadow-lg">
+          <Globe className="w-10 h-10 text-steel-blue mx-auto mb-3" />
+          <p className="text-lg font-bold text-deep-sea">Global Leaderboards</p>
+          <p className="text-sm text-steel-blue">Prove you're the best</p>
         </div>
       </div>
       
       {/* Games Preview */}
-      <div className="animate-fade-in mb-6" style={{ animationDelay: '400ms' }}>
-        <h2 className="text-xl font-bold text-deep-sea mb-4 text-center">Choose Your Battle</h2>
+      <div className="animate-fade-in mb-12 md:mb-16" style={{ animationDelay: '400ms' }}>
+        <h2 className="text-3xl md:text-4xl font-bold text-deep-sea mb-6 text-center tracking-tight">Choose Your Battle</h2>
         <Carousel
           opts={{
             align: "center",
@@ -98,10 +99,10 @@ export function Dashboard({ onPlayClick }: DashboardProps) {
           }}
           className="w-full"
         >
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ml-4">
             {games.map((game, index) => (
-              <CarouselItem key={index} className="pl-2 basis-4/5">
-                <div className="h-32">
+              <CarouselItem key={index} className="pl-4 basis-full sm:basis-1/2 lg:basis-1/3">
+                <div className="h-40">
                   <GameCard
                     title={game.title}
                     description={game.description}
@@ -114,25 +115,30 @@ export function Dashboard({ onPlayClick }: DashboardProps) {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="text-deep-sea bg-white/80 hover:bg-white border-gray-200 shadow-md -left-2" />
-          <CarouselNext className="text-deep-sea bg-white/80 hover:bg-white border-gray-200 shadow-md -right-2" />
+          <CarouselPrevious className="text-deep-sea bg-white/80 hover:bg-white border-gray-200 shadow-md -left-4 disabled:opacity-50" />
+          <CarouselNext className="text-deep-sea bg-white/80 hover:bg-white border-gray-200 shadow-md -right-4 disabled:opacity-50" />
         </Carousel>
       </div>
 
       {/* CTA Section */}
       <div className="text-center animate-fade-in" style={{ animationDelay: '600ms' }}>
-        <div className="bg-gradient-to-br from-deep-sea to-steel-blue text-white p-6 rounded-3xl shadow-xl">
-          <Trophy className="w-12 h-12 text-gold mx-auto mb-3" />
-          <h3 className="text-lg font-bold mb-2">Join the Competition</h3>
-          <p className="text-sm text-white/90 mb-4">
-            Connect with Nostr. Play instantly. Win rewards.
-          </p>
-          <Button
-            onClick={onPlayClick}
-            className="w-full bg-gold hover:bg-gold/90 text-deep-sea font-bold h-12 rounded-xl"
-          >
-            Connect & Play
-          </Button>
+        <div className="bg-gradient-to-br from-deep-sea to-steel-blue text-white p-8 md:p-10 rounded-3xl shadow-xl relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full opacity-50"></div>
+            <div className="absolute -bottom-16 -left-8 w-48 h-48 bg-white/10 rounded-full opacity-50"></div>
+          <div className="relative z-10">
+            <Trophy className="w-16 h-16 text-gold mx-auto mb-4" />
+            <h3 className="text-2xl md:text-3xl font-bold mb-3">Join the Competition</h3>
+            <p className="text-base text-white/90 mb-6 max-w-md mx-auto">
+              Connect with your Nostr account to play instantly and start winning real rewards.
+            </p>
+            <Button
+              onClick={onPlayClick}
+              size="lg"
+              className="w-full sm:w-auto bg-gold hover:bg-gold/90 text-deep-sea font-bold h-14 rounded-2xl px-8"
+            >
+              Connect & Play
+            </Button>
+          </div>
         </div>
       </div>
     </div>
