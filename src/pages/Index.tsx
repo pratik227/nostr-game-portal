@@ -110,6 +110,16 @@ export default function Index() {
     const nostrProfile = await getProfileFromPubkey(userPubkey);
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
     setSupabaseUser(user);
+    
+    // Show key management interface for new users
+    setTimeout(() => {
+      showKeyManagement();
+    }, 1000); // Small delay to ensure the user is fully set up
+  };
+
+  const showKeyManagement = () => {
+    // Launch the nostr-login key management interface
+    document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'options' }));
   };
 
   const handleLogout = (dispatchEvent = true) => {
