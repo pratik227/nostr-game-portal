@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
@@ -179,7 +180,7 @@ export default function Index() {
       {!isLoggedIn && (
         <Navbar
           isLoggedIn={isLoggedIn}
-          currentPage={currentPage}
+          currentPage={currentPage as 'dashboard' | 'profile'}
           onNavigate={handleNavigate}
           onLogout={handleLogout}
           onLoginClick={launchNostrLoginForm}

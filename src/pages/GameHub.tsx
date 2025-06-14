@@ -1,10 +1,9 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Gamepad2, Trophy, Users, Settings, LogOut, User, Wallet, Play } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play } from 'lucide-react';
+import FloatingActionMenu from '@/components/FloatingActionMenu';
 
 interface GameHubProps {
   onLogout: () => void;
@@ -44,7 +43,6 @@ const games = [
 
 export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'friends'>('games');
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handlePlayGame = (gameId: number) => {
     console.log(`Playing game ${gameId}`);
@@ -129,6 +127,24 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
     }
   };
 
+  const menuOptions = [
+    {
+      label: "Profile",
+      Icon: <User className="w-4 h-4" />,
+      onClick: onNavigateToProfile,
+    },
+    {
+      label: "Wallet (soon)",
+      Icon: <Wallet className="w-4 h-4" />,
+      onClick: () => {}, // Wallet is coming soon
+    },
+    {
+      label: "Logout",
+      Icon: <LogOut className="w-4 h-4" />,
+      onClick: onLogout,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background relative">
       {/* Main Content */}
@@ -180,56 +196,8 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
         </div>
       </div>
 
-      {/* Floating Settings Button */}
-      <Button
-        onClick={() => setSettingsOpen(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-steel-blue hover:bg-deep-sea text-white shadow-lg hover:shadow-xl transition-all duration-300"
-      >
-        <Settings className="w-6 h-6" />
-      </Button>
+      <FloatingActionMenu options={menuOptions} className="bottom-20" />
 
-      {/* Settings Dialog */}
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSettingsOpen(false);
-                onNavigateToProfile();
-              }}
-              className="w-full justify-start text-left"
-            >
-              <User className="w-4 h-4 mr-3" />
-              Profile
-            </Button>
-            
-            <Button
-              variant="ghost"
-              disabled
-              className="w-full justify-start text-left text-gray-400"
-            >
-              <Wallet className="w-4 h-4 mr-3" />
-              Wallet (Coming Soon)
-            </Button>
-            
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSettingsOpen(false);
-                onLogout();
-              }}
-              className="w-full justify-start text-left text-ruby hover:text-ruby hover:bg-ruby/10"
-            >
-              <LogOut className="w-4 h-4 mr-3" />
-              Logout
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
