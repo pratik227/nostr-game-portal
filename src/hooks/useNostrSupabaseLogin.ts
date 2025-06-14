@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import * as nip19 from 'nostr-tools/nip19'
 import type { NostrProfile } from "@/lib/nostr";
 
 // TODO: Replace this with your actual Supabase project URL (found in your Supabase > Project Settings > API)
@@ -12,6 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export interface SupabaseUser {
   id: string;
   pubkey: string;
+  npub?: string;
   name?: string;
   display_name?: string;
   about?: string;
@@ -33,6 +35,9 @@ export function useNostrSupabaseLogin() {
   const loginOrSignup = async (pubkey: string, profile: NostrProfile) => {
     setIsProcessing(true);
     setError(null);
+
+    // Encode pubkey to npub format
+    const npub = nip19.npubEncode(pubkey);
 
     // 1. Try to fetch by pubkey
     const { data: users, error: fetchError } = await supabase
@@ -60,6 +65,7 @@ export function useNostrSupabaseLogin() {
       .insert([
         {
           pubkey,
+          npub,
           name: profile.name,
           display_name: profile.display_name,
           about: profile.about,
