@@ -13,12 +13,14 @@ interface GameCardProps {
 }
 
 export function GameCard({ title, description, icon: Icon, status, gradient, onClick }: GameCardProps) {
+  const isAvailable = status === 'available';
+
   return (
     <Card 
-      className={`group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl bg-gradient-to-br ${gradient} border-0 text-white overflow-hidden relative shadow-lg`}
+      className={`group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl bg-gradient-to-br ${gradient} border-0 text-white overflow-hidden relative shadow-lg rounded-2xl`}
       onClick={onClick}
     >
-      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors duration-300" />
+      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300" />
       
       <CardHeader className="relative z-10 pb-4">
         <div className="flex items-center justify-between mb-4">
@@ -27,12 +29,12 @@ export function GameCard({ title, description, icon: Icon, status, gradient, onC
           </div>
           <Badge 
             className={`border-0 text-xs font-semibold px-3 py-1 rounded-full ${
-              status === 'available' 
-                ? 'bg-green-500 text-white shadow-md' 
+              isAvailable 
+                ? 'bg-gold text-deep-sea shadow-md' 
                 : 'bg-gray-700/80 text-gray-200'
             }`}
           >
-            {status === 'available' ? 'PLAY NOW' : 'COMING SOON'}
+            {isAvailable ? 'PLAY NOW' : 'COMING SOON'}
           </Badge>
         </div>
         <CardTitle className="text-xl font-bold text-white drop-shadow-sm">
@@ -46,7 +48,7 @@ export function GameCard({ title, description, icon: Icon, status, gradient, onC
         </CardDescription>
       </CardContent>
 
-      <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-white/10 rounded-full transition-transform duration-500 group-hover:scale-150" />
+      <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-white/10 rounded-full transition-transform duration-500 group-hover:scale-[150%]" />
     </Card>
   )
 }

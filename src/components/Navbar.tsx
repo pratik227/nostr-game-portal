@@ -1,77 +1,74 @@
 
 import { Button } from '@/components/ui/button'
 import { User, Home, LogOut, Gamepad2 } from 'lucide-react'
-import { formatPubkey } from '@/lib/nostr'
 
 interface NavbarProps {
+  isLoggedIn: boolean;
   currentPage: 'dashboard' | 'profile'
   onNavigate: (page: 'dashboard' | 'profile') => void
   onLogout: () => void
+  onLoginClick: () => void
   pubkey: string
 }
 
-export function Navbar({ currentPage, onNavigate, onLogout, pubkey }: NavbarProps) {
+export function Navbar({ isLoggedIn, currentPage, onNavigate, onLogout, onLoginClick }: NavbarProps) {
   return (
-    <nav className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
+    <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onNavigate('dashboard')}>
+            <div className="w-10 h-10 bg-gradient-to-br from-steel-blue to-deep-sea rounded-xl flex items-center justify-center shadow-md">
               <Gamepad2 className="text-white w-5 h-5" />
             </div>
-            <div>
-              <span className="text-xl font-bold text-gray-900">Nostr Gaming</span>
-              <p className="text-xs text-gray-500 -mt-1">Decentralized Fun</p>
-            </div>
+            <span className="text-xl font-bold text-deep-sea hidden sm:block">Nostr Gaming</span>
           </div>
           
-          {/* Navigation */}
-          <div className="flex items-center space-x-2">
-            <Button
-              variant={currentPage === 'dashboard' ? 'default' : 'ghost'}
-              onClick={() => onNavigate('dashboard')}
-              className={`${
-                currentPage === 'dashboard' 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              } rounded-lg transition-all duration-200`}
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Dashboard
-            </Button>
-            
-            <Button
-              variant={currentPage === 'profile' ? 'default' : 'ghost'}
-              onClick={() => onNavigate('profile')}
-              className={`${
-                currentPage === 'profile' 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              } rounded-lg transition-all duration-200`}
-            >
-              <User className="w-4 h-4 mr-2" />
-              Profile
-            </Button>
-            
-            {/* User Info */}
-            <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200">
-              <div className="text-sm">
-                <p className="text-gray-900 font-medium">Connected</p>
-                <p className="text-gray-500 text-xs">{formatPubkey(pubkey).slice(0, 12)}...</p>
-              </div>
-              
+          {/* Navigation & User Section */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            {isLoggedIn ? (
+              <>
+                <Button
+                  variant={currentPage === 'dashboard' ? 'secondary' : 'ghost'}
+                  onClick={() => onNavigate('dashboard')}
+                  className="font-semibold rounded-lg"
+                >
+                  <Home className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Button>
+                
+                <Button
+                  variant={currentPage === 'profile' ? 'secondary' : 'ghost'}
+                  onClick={() => onNavigate('profile')}
+                  className="font-semibold rounded-lg"
+                >
+                  <User className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Profile</span>
+                </Button>
+                
+                <div className="pl-2 ml-2 border-l border-gray-200">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onLogout}
+                    className="text-ruby hover:bg-ruby/10 hover:text-ruby rounded-full"
+                    aria-label="Log out"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </Button>
+                </div>
+              </>
+            ) : (
               <Button
-                variant="ghost"
-                onClick={onLogout}
-                className="text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg"
+                onClick={onLoginClick}
+                className="bg-gold hover:bg-gold/90 text-deep-sea font-bold shadow-sm rounded-lg"
               >
-                <LogOut className="w-4 h-4" />
+                Login
               </Button>
-            </div>
+            )}
           </div>
         </div>
       </div>
-    </nav>
+    </header>
   )
 }
