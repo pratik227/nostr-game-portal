@@ -64,7 +64,7 @@ export default function Index() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Navbar
         currentPage={currentPage}
         onNavigate={handleNavigate}
@@ -72,7 +72,7 @@ export default function Index() {
         pubkey={pubkey}
       />
       
-      <main className="pt-6">
+      <main className="pt-4">
         {currentPage === 'dashboard' ? (
           <Dashboard />
         ) : (

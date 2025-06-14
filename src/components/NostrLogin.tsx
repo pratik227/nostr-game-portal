@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { User, Zap } from 'lucide-react'
+import { User, Zap, Shield, Gamepad2 } from 'lucide-react'
 
 interface NostrLoginProps {
   onLogin: (pubkey: string) => void
@@ -35,7 +35,7 @@ export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
     script.setAttribute('data-perms', 'sign_event:1,sign_event:0')
     script.setAttribute('data-title', 'Nostr Gaming Hub')
     script.setAttribute('data-description', 'Connect your Nostr identity to access minigames')
-    script.setAttribute('data-no-banner', 'true') // Disable the nostr-login banner
+    script.setAttribute('data-no-banner', 'true')
     script.onload = () => {
       setNostrLoginReady(true)
     }
@@ -93,33 +93,48 @@ export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
     if (nostrLoginReady) {
       document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }))
     } else {
-      handleLogin() // Fallback for extension login
+      handleLogin()
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-sm">
-        <Card className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 shadow-2xl shadow-purple-500/10 animate-fade-in">
-          <CardHeader className="items-center text-center p-8">
-            <div className="p-4 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-6">
-              <Zap size={40} className="text-white" />
-            </div>
-            <CardTitle className="text-3xl font-bold tracking-tight">
-              Welcome to Nostr Gaming
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        {/* Hero Section */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-6 shadow-lg">
+            <Gamepad2 size={36} className="text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            Welcome to Nostr Gaming
+          </h1>
+          <p className="text-gray-600 text-lg leading-relaxed">
+            Connect with your decentralized identity and unlock a world of gaming experiences
+          </p>
+        </div>
+
+        {/* Login Card */}
+        <Card className="bg-white/80 backdrop-blur-sm border border-gray-200/50 shadow-xl shadow-gray-200/20">
+          <CardHeader className="text-center pb-6 pt-8 px-8">
+            <CardTitle className="text-2xl font-semibold text-gray-900 mb-2">
+              Get Started
             </CardTitle>
-            <CardDescription className="text-gray-400 max-w-xs mx-auto pt-2">
-              Unlock a world of decentralized games. Connect securely with your Nostr identity.
+            <CardDescription className="text-gray-600">
+              Secure, decentralized authentication via Nostr protocol
             </CardDescription>
           </CardHeader>
+          
           <CardContent className="px-8 pb-8">
             <Button
               onClick={launchLogin}
               disabled={isLoading}
-              className="w-full text-lg py-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-600/20"
+              className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
             >
               {isLoading ? (
-                'Connecting...'
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  Connecting...
+                </div>
               ) : (
                 <>
                   <User className="mr-2 h-5 w-5" />
@@ -127,8 +142,27 @@ export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
                 </>
               )}
             </Button>
-            <p className="text-xs text-gray-500 text-center mt-4">
-              Uses NIP-07 browser extension or NIP-46 remote signing.
+            
+            {/* Features */}
+            <div className="mt-8 space-y-4">
+              <div className="flex items-start space-x-3">
+                <Shield className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Secure & Private</p>
+                  <p className="text-xs text-gray-600">Your keys, your identity</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <Zap className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Lightning Fast</p>
+                  <p className="text-xs text-gray-600">Instant authentication</p>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500 text-center mt-6">
+              Uses NIP-07 browser extension or NIP-46 remote signing
             </p>
           </CardContent>
         </Card>

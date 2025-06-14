@@ -15,35 +15,38 @@ interface GameCardProps {
 export function GameCard({ title, description, icon: Icon, status, gradient, onClick }: GameCardProps) {
   return (
     <Card 
-      className={`group cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-500/20 bg-gradient-to-br ${gradient} border border-white/10 text-white overflow-hidden relative`}
+      className={`group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl bg-gradient-to-br ${gradient} border-0 text-white overflow-hidden relative shadow-lg`}
       onClick={onClick}
     >
-      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300" />
+      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors duration-300" />
       
-      <CardHeader className="relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="p-3 bg-white/10 rounded-lg">
-            <Icon className="w-8 h-8 text-white/90" />
+      <CardHeader className="relative z-10 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl shadow-md">
+            <Icon className="w-7 h-7 text-white drop-shadow-sm" />
           </div>
           <Badge 
-            variant="secondary"
-            className={`border-0 text-xs font-bold ${status === 'available' ? 'bg-green-500/90 text-white' : 'bg-gray-700/80 text-gray-300'}`}
+            className={`border-0 text-xs font-semibold px-3 py-1 rounded-full ${
+              status === 'available' 
+                ? 'bg-green-500 text-white shadow-md' 
+                : 'bg-gray-700/80 text-gray-200'
+            }`}
           >
             {status === 'available' ? 'PLAY NOW' : 'COMING SOON'}
           </Badge>
         </div>
-        <CardTitle className="text-2xl font-bold pt-4 text-white">
+        <CardTitle className="text-xl font-bold text-white drop-shadow-sm">
           {title}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="relative z-10">
-        <CardDescription className="text-white/70">
+      <CardContent className="relative z-10 pt-0">
+        <CardDescription className="text-white/90 leading-relaxed">
           {description}
         </CardDescription>
       </CardContent>
 
-      <div className="absolute -bottom-16 -right-16 w-32 h-32 bg-white/5 rounded-full transition-transform duration-500 group-hover:scale-[2.5]" />
+      <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-white/10 rounded-full transition-transform duration-500 group-hover:scale-150" />
     </Card>
   )
 }
