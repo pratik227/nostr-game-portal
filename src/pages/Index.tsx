@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
@@ -157,7 +156,7 @@ export default function Index() {
     // Show appropriate page for logged-in users
     switch (currentPage) {
       case 'profile':
-        return <Profile pubkey={pubkey} key={profileReloadKey} />;
+        return <Profile pubkey={pubkey} key={profileReloadKey} onBack={() => setCurrentPage('gamehub')} />;
       case 'gamehub':
         return (
           <GameHub 

@@ -6,15 +6,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { User, Globe, Mail, Copy, ExternalLink } from 'lucide-react'
+import { User, Globe, Mail, Copy, ExternalLink, ArrowLeft } from 'lucide-react'
 import { getProfileFromPubkey, getProfileFromNip05, formatPubkey, NostrProfile } from '@/lib/nostr'
 import { toast } from 'sonner'
 
 interface ProfileProps {
   pubkey: string
+  onBack: () => void
 }
 
-export function Profile({ pubkey }: ProfileProps) {
+export function Profile({ pubkey, onBack }: ProfileProps) {
   const [profile, setProfile] = useState<NostrProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [nip05Input, setNip05Input] = useState('')
@@ -69,9 +70,14 @@ export function Profile({ pubkey }: ProfileProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6">
-      <div className="mb-8 text-center sm:text-left">
-        <h1 className="text-4xl font-bold text-deep-sea mb-2">Nostr Profile</h1>
-        <p className="text-steel-blue text-lg">Your identity on the decentralized web.</p>
+      <div className="flex items-center gap-4 mb-8">
+        <Button onClick={onBack} variant="outline" size="icon" className="shrink-0">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-deep-sea leading-tight">Nostr Profile</h1>
+          <p className="text-steel-blue text-md sm:text-lg">Your identity on the decentralized web.</p>
+        </div>
       </div>
 
       {/* NIP-05 Lookup Section */}
