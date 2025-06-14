@@ -4,7 +4,7 @@ import { Dashboard } from '@/components/Dashboard'
 import { Profile } from '@/components/Profile'
 import { LoginModal } from '@/components/LoginModal'
 import { getProfileFromPubkey } from "@/lib/nostr";
-import { useNostrSupabaseLogin } from "@/hooks/useNostrSupabaseLogin"
+import { useNostrSupabaseLogin, type SupabaseUser } from "@/hooks/useNostrSupabaseLogin"
 
 // This declaration is needed to inform TypeScript about the nostr object
 // that might be injected into the window by browser extensions like Alby or GetSimple.
@@ -22,7 +22,7 @@ export default function Index() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [supabaseUser, setSupabaseUser] = useState(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const { loginOrSignup, isProcessing, error } = useNostrSupabaseLogin();
 
   useEffect(() => {
