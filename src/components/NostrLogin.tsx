@@ -6,6 +6,7 @@ import { User, Zap } from 'lucide-react'
 
 interface NostrLoginProps {
   onLogin: (pubkey: string) => void
+  onSignup: (pubkey: string) => void
 }
 
 declare global {
@@ -22,7 +23,7 @@ declare global {
   }
 }
 
-export function NostrLogin({ onLogin }: NostrLoginProps) {
+export function NostrLogin({ onLogin, onSignup }: NostrLoginProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [nostrLoginReady, setNostrLoginReady] = useState(false)
 
@@ -42,8 +43,10 @@ export function NostrLogin({ onLogin }: NostrLoginProps) {
     // Listen for auth events
     const handleAuth = (e: any) => {
       console.log('Auth event:', e.detail)
-      if (e.detail.type === 'login' || e.detail.type === 'signup') {
+      if (e.detail.type === 'login') {
         handleLogin()
+      } else if (e.detail.type === 'signup') {
+        handleSignup()
       }
     }
 
@@ -66,6 +69,20 @@ export function NostrLogin({ onLogin }: NostrLoginProps) {
       }
     } catch (error) {
       console.error('Login failed:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSignup = async () => {
+    setIsLoading(true)
+    try {
+      if (window.nostr) {
+        const pubkey = await window.nostr.getPublicKey()
+        onSignup(pubkey)
+      }
+    } catch (error) {
+      console.error('Signup failed:', error)
     } finally {
       setIsLoading(false)
     }

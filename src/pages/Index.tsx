@@ -9,6 +9,7 @@ export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [pubkey, setPubkey] = useState<string>('')
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
+  const [profileReloadKey, setProfileReloadKey] = useState(0)
 
   useEffect(() => {
     // Check if user is already logged in (stored in localStorage by nostr-login)
@@ -35,6 +36,14 @@ export default function Index() {
     console.log('User logged in with pubkey:', userPubkey)
   }
 
+  const handleSignup = (userPubkey: string) => {
+    setPubkey(userPubkey)
+    setIsLoggedIn(true)
+    // Trigger profile reload after signup to fetch the new name
+    setProfileReloadKey(prev => prev + 1)
+    console.log('User signed up with pubkey:', userPubkey, 'Profile will be reloaded')
+  }
+
   const handleLogout = () => {
     // Dispatch logout event to nostr-login
     document.dispatchEvent(new Event("nlLogout"))
@@ -42,6 +51,7 @@ export default function Index() {
     setIsLoggedIn(false)
     setPubkey('')
     setCurrentPage('dashboard')
+    setProfileReloadKey(0)
     console.log('User logged out')
   }
 
@@ -50,7 +60,7 @@ export default function Index() {
   }
 
   if (!isLoggedIn) {
-    return <NostrLogin onLogin={handleLogin} />
+    return <NostrLogin onLogin={handleLogin} onSignup={handleSignup} />
   }
 
   return (
@@ -66,7 +76,7 @@ export default function Index() {
         {currentPage === 'dashboard' ? (
           <Dashboard />
         ) : (
-          <Profile pubkey={pubkey} />
+          <Profile pubkey={pubkey} key={profileReloadKey} />
         )}
       </main>
     </div>
