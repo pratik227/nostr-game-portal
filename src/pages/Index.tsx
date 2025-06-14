@@ -126,7 +126,6 @@ export default function Index() {
     }
   }
 
-  // New: launch NostrLogin form (dispatch event)
   const launchNostrLoginForm = () => {
     document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
   }
@@ -149,7 +148,6 @@ export default function Index() {
           <Profile pubkey={pubkey} key={profileReloadKey} />
         )}
       </main>
-      {/* LoginModal removed */}
     </div>
   )
 }
