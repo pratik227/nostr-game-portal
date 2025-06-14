@@ -1,9 +1,10 @@
-
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
 import { Profile } from '@/components/Profile'
 import { LoginModal } from '@/components/LoginModal'
+import { getProfileFromPubkey } from "@/lib/nostr";
+import { useNostrSupabaseLogin } from "@/hooks/useNostrSupabaseLogin"
 
 // This declaration is needed to inform TypeScript about the nostr object
 // that might be injected into the window by browser extensions like Alby or GetSimple.
@@ -21,6 +22,8 @@ export default function Index() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [supabaseUser, setSupabaseUser] = useState(null);
+  const { loginOrSignup, isProcessing, error } = useNostrSupabaseLogin();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -80,21 +83,34 @@ export default function Index() {
     }
   }, [])
 
-  const handleLogin = (userPubkey: string, closeModal = true) => {
-    setPubkey(userPubkey)
-    setIsLoggedIn(true)
-    if (closeModal) setShowLoginModal(false)
-    console.log('User logged in with pubkey:', userPubkey)
-  }
+  const handleLogin = async (userPubkey: string, closeModal = true) => {
+    setPubkey(userPubkey);
+    setIsLoggedIn(true);
+    if (closeModal) setShowLoginModal(false);
+    console.log("User logged in with pubkey:", userPubkey);
 
-  const handleSignup = (userPubkey: string) => {
-    setPubkey(userPubkey)
-    setIsLoggedIn(true)
-    setShowLoginModal(false)
-    // Trigger profile reload after signup to fetch the new name
-    setProfileReloadKey(prev => prev + 1)
-    console.log('User signed up with pubkey:', userPubkey, 'Profile will be reloaded')
-  }
+    // 1. Fetch Nostr profile
+    const nostrProfile = await getProfileFromPubkey(userPubkey);
+
+    // 2. Call Supabase loginOrSignup to check/insert user
+    const user = await loginOrSignup(userPubkey, nostrProfile || {});
+    setSupabaseUser(user);
+  };
+
+  const handleSignup = async (userPubkey: string) => {
+    setPubkey(userPubkey);
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+    setProfileReloadKey((prev) => prev + 1);
+    console.log("User signed up with pubkey:", userPubkey, "Profile will be reloaded");
+
+    // 1. Fetch Nostr profile for new user
+    const nostrProfile = await getProfileFromPubkey(userPubkey);
+
+    // 2. Call Supabase loginOrSignup to create user
+    const user = await loginOrSignup(userPubkey, nostrProfile || {});
+    setSupabaseUser(user);
+  };
 
   const handleLogout = (dispatchEvent = true) => {
     if (dispatchEvent) {
