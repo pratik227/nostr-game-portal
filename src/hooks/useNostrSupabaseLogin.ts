@@ -3,9 +3,10 @@ import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import type { NostrProfile } from "@/lib/nostr";
 
-// Assumes Supabase project URL/anon key are available as env variables or globally
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+// TODO: Replace this with your actual Supabase project URL (found in your Supabase > Project Settings > API)
+const supabaseUrl = "YOUR_SUPABASE_URL_HERE"; // e.g. https://xxxxx.supabase.co
+const supabaseKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5xemtmaWl5anR6c3lrZGNhaWd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5MjExODMsImV4cCI6MjA2NTQ5NzE4M30.a4zieWCgxE-_Yyy8J2d482EK-gD50SLzglrfH9_zRg0";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface SupabaseUser {
