@@ -1,7 +1,7 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play } from 'lucide-react';
 import FloatingActionMenu from '@/components/FloatingActionMenu';
 
@@ -51,45 +51,54 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
 
   const renderGames = () => (
     <div className="p-4 pb-24">
-      <h1 className="text-2xl font-bold text-deep-sea mb-6">Choose Your Game</h1>
-      <div className="grid gap-4">
-        {games.map((game) => (
-          <Card key={game.id} className="overflow-hidden bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-            <CardContent className="p-0">
-              <div className="relative">
-                <img 
-                  src={game.preview} 
-                  alt={game.name}
-                  className="w-full h-32 object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                <Badge className="absolute top-3 right-3 bg-steel-blue text-white border-0">
-                  <Users className="w-3 h-3 mr-1" />
-                  {game.maxPlayers}
-                </Badge>
-              </div>
+      <h1 className="text-3xl font-bold text-deep-sea mb-6 tracking-tight">Choose Your Game</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {games.map((game) => {
+          const CardComponent = game.comingSoon ? 'div' : 'button';
+
+          return (
+            <CardComponent
+              key={game.id}
+              className={`relative group rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1 text-left w-full ${
+                game.comingSoon ? 'cursor-not-allowed' : 'cursor-pointer'
+              }`}
+              onClick={() => !game.comingSoon && handlePlayGame(game.id)}
+              disabled={game.comingSoon}
+            >
+              <img
+                src={game.preview}
+                alt={game.name}
+                className="w-full h-48 object-cover transition-transform duration-500 ease-in-out group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
               
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-deep-sea text-lg">{game.name}</h3>
-                  {game.comingSoon && (
-                    <Badge variant="outline" className="text-xs mt-1 text-gray-500">
-                      Coming Soon
-                    </Badge>
+              {game.comingSoon && (
+                <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+                  <Badge variant="outline" className="bg-black/50 text-white/90 border-white/30 backdrop-blur-md text-base px-5 py-2 rounded-xl">
+                    Coming Soon
+                  </Badge>
+                </div>
+              )}
+
+              <div className="absolute inset-0 p-4 flex flex-col justify-end">
+                <h3 className="text-white font-bold text-2xl drop-shadow-lg">{game.name}</h3>
+                
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-1.5 text-white/90 text-sm bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Users className="w-4 h-4" />
+                    <span>{game.maxPlayers} Players</span>
+                  </div>
+                  
+                  {!game.comingSoon && (
+                    <div className="bg-gold p-3 rounded-full text-deep-sea transform transition-all duration-300 ease-in-out group-hover:scale-110 group-hover:bg-yellow-400 shadow-lg">
+                      <Play className="w-6 h-6 fill-current" />
+                    </div>
                   )}
                 </div>
-                
-                <Button
-                  onClick={() => handlePlayGame(game.id)}
-                  disabled={game.comingSoon}
-                  className="bg-gold hover:bg-gold/90 text-deep-sea font-bold rounded-full w-12 h-12 p-0 shadow-lg"
-                >
-                  <Play className="w-5 h-5 fill-current" />
-                </Button>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            </CardComponent>
+          );
+        })}
       </div>
     </div>
   );
