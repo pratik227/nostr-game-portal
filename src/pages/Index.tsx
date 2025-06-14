@@ -5,6 +5,16 @@ import { Dashboard } from '@/components/Dashboard'
 import { Profile } from '@/components/Profile'
 import { LoginModal } from '@/components/LoginModal'
 
+// This declaration is needed to inform TypeScript about the nostr object
+// that might be injected into the window by browser extensions like Alby or GetSimple.
+declare global {
+  interface Window {
+    nostr?: {
+      getPublicKey(): Promise<string>
+    }
+  }
+}
+
 export default function Index() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [pubkey, setPubkey] = useState<string>('')
