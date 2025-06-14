@@ -21,35 +21,47 @@ export default function Index() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard')
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [wasLoggedInBefore, setWasLoggedInBefore] = useState(false);
   const { loginOrSignup, isProcessing, error } = useNostrSupabaseLogin();
 
   useEffect(() => {
-    // Check if user is already logged in
+    let scriptLoaded = false;
+
+    // Check if user was logged in before
     const checkExistingLogin = async () => {
       try {
         if (window.nostr) {
           const pk = await window.nostr.getPublicKey()
           if (pk) {
+            setWasLoggedInBefore(true);
             handleLogin(pk, false)
           }
         }
       } catch (error) {
         console.log('No existing login found')
+        setWasLoggedInBefore(false);
       }
     }
 
-    // Load nostr-login script and set up listeners
-    const script = document.createElement('script')
-    script.src = 'https://www.unpkg.com/nostr-login@latest/dist/unpkg.js'
-    script.setAttribute('data-theme', 'purple')
-    script.setAttribute('data-perms', 'sign_event:1,sign_event:0')
-    script.setAttribute('data-title', 'Nostr Gaming Hub')
-    script.setAttribute('data-description', 'Connect your Nostr identity to access minigames')
-    script.setAttribute('data-no-banner', 'true')
-    script.onload = () => {
+    // Load nostr-login script only once
+    if (!document.querySelector('script[src*="nostr-login"]') && !scriptLoaded) {
+      const script = document.createElement('script')
+      script.src = 'https://www.unpkg.com/nostr-login@latest/dist/unpkg.js'
+      script.setAttribute('data-theme', 'purple')
+      script.setAttribute('data-perms', 'sign_event:1,sign_event:0')
+      script.setAttribute('data-title', 'Nostr Gaming Hub')
+      script.setAttribute('data-description', 'Connect your Nostr identity to access minigames')
+      script.setAttribute('data-no-banner', 'true')
+      
+      script.onload = () => {
+        scriptLoaded = true;
+        checkExistingLogin()
+      }
+      
+      document.head.appendChild(script)
+    } else {
       checkExistingLogin()
     }
-    document.head.appendChild(script)
 
     const handleAuth = async (e: any) => {
       console.log('Auth event:', e.detail)
@@ -66,17 +78,16 @@ export default function Index() {
         console.error("Failed to get public key after auth event", error);
       }
     }
-    document.addEventListener('nlAuth', handleAuth)
     
     const handleNLLogout = () => handleLogout(false)
+
+    // Add event listeners only if not already added
+    document.addEventListener('nlAuth', handleAuth)
     document.addEventListener('nlLogout', handleNLLogout)
 
     return () => {
       document.removeEventListener('nlAuth', handleAuth)
       document.removeEventListener('nlLogout', handleNLLogout)
-      if (script.parentNode) {
-        script.parentNode.removeChild(script)
-      }
     }
   }, [])
 
@@ -107,6 +118,7 @@ export default function Index() {
     setPubkey('')
     setCurrentPage('dashboard')
     setProfileReloadKey(0)
+    setWasLoggedInBefore(false)
     console.log('User logged out')
   }
 
@@ -127,7 +139,10 @@ export default function Index() {
   }
 
   const launchNostrLoginForm = () => {
-    document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
+    // Show different modals based on previous login status
+    const startScreen = wasLoggedInBefore ? 'switch-account' : 'welcome';
+    console.log('Launching nostr login with screen:', startScreen);
+    document.dispatchEvent(new CustomEvent('nlLaunch', { detail: startScreen }));
   }
 
   return (
