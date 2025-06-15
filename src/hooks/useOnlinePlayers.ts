@@ -9,6 +9,11 @@ export interface OnlinePlayer {
   name?: string;
   display_name?: string;
   picture?: string;
+  about?: string;
+  nip05?: string;
+  lud16?: string;
+  website?: string;
+  banner?: string;
   last_seen_at: string;
   status: 'online' | 'recent';
 }
@@ -26,7 +31,7 @@ export function useOnlinePlayers(userPubkey: string) {
       
       const { data: onlineUsersData } = await supabase
         .from('users')
-        .select('id, pubkey, npub, name, display_name, picture, last_seen_at')
+        .select('id, pubkey, npub, name, display_name, picture, last_seen_at, about, nip05, lud16, website, banner')
         .not('last_seen_at', 'is', null)
         .gte('last_seen_at', twentyFourHoursAgo)
         .order('last_seen_at', { ascending: false })
@@ -50,6 +55,11 @@ export function useOnlinePlayers(userPubkey: string) {
             name: user.name || undefined,
             display_name: user.display_name || undefined,
             picture: user.picture || undefined,
+            about: user.about || undefined,
+            nip05: user.nip05 || undefined,
+            lud16: user.lud16 || undefined,
+            website: user.website || undefined,
+            banner: user.banner || undefined,
             last_seen_at: user.last_seen_at!,
             status: (lastSeenTime > fifteenMinutesAgo ? 'online' : 'recent') as 'online' | 'recent'
           };
