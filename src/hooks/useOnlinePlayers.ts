@@ -30,7 +30,7 @@ export function useOnlinePlayers(userPubkey: string) {
 
       const friendPubkeys = friendsData?.map(f => f.followed_pubkey) || [];
 
-      // Get all users who were active in the last 24 hours
+      // Get all users who were active in the last 24 hours - increased limit for mobile scrolling
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
       const { data: onlineUsersData } = await supabase
@@ -39,7 +39,7 @@ export function useOnlinePlayers(userPubkey: string) {
         .not('last_seen_at', 'is', null)
         .gte('last_seen_at', twentyFourHoursAgo)
         .order('last_seen_at', { ascending: false })
-        .limit(20); // Get more than we need to ensure we have enough after filtering
+        .limit(50); // Increased for better mobile scrolling experience
 
       if (!onlineUsersData) return;
 
@@ -62,7 +62,7 @@ export function useOnlinePlayers(userPubkey: string) {
             picture: user.picture || undefined,
             last_seen_at: user.last_seen_at!,
             is_friend: isFriend,
-            status: lastSeenTime > fifteenMinutesAgo ? 'online' : 'recent'
+            status: (lastSeenTime > fifteenMinutesAgo ? 'online' : 'recent') as 'online' | 'recent'
           };
         })
         // Sort by: friends first, then by recency
@@ -70,8 +70,7 @@ export function useOnlinePlayers(userPubkey: string) {
           if (a.is_friend && !b.is_friend) return -1;
           if (!a.is_friend && b.is_friend) return 1;
           return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
-        })
-        .slice(0, 8); // Limit to 8 players
+        });
 
       setOnlinePlayers(players);
     } catch (error) {
