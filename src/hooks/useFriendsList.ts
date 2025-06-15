@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
@@ -37,7 +36,7 @@ export function useFriendsList(userPubkey: string) {
         console.error('Supabase error loading friends:', error);
         throw error;
       }
-      
+
       console.log('Loaded friends from cache:', data);
       setFriends(data || []);
     } catch (error) {
@@ -121,13 +120,11 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Add a friend
+  // Add a friend (no auth required, RLS disabled)
   const addFriend = async (pubkeyOrNpub: string) => {
     console.log('Adding friend:', pubkeyOrNpub);
     try {
       let pubkey = pubkeyOrNpub;
-      
-      // Convert npub to pubkey if needed
       if (pubkeyOrNpub.startsWith('npub')) {
         try {
           const decoded = nip19.decode(pubkeyOrNpub);
@@ -137,30 +134,26 @@ export function useFriendsList(userPubkey: string) {
           }
         } catch (error) {
           console.error('Invalid npub format:', error);
-          toast.error('Invalid npub format');
           return;
         }
       }
 
-      // Check if friend already exists
+      // Check if friend already exists for this user_pubkey
       const { data: existingFriend } = await supabase
         .from('follow_npub')
         .select('id')
         .eq('user_pubkey', userPubkey)
         .eq('followed_pubkey', pubkey)
-        .single();
+        .maybeSingle();
 
       if (existingFriend) {
-        toast.error('Friend already added');
+        console.error('Friend already added');
         return;
       }
 
       // Fetch profile
-      console.log('Fetching profile for new friend:', pubkey);
       const profile = await getProfileFromPubkey(pubkey);
       const npub = formatPubkey(pubkey);
-
-      console.log('Fetched profile:', profile);
 
       // Add to cache
       const { error } = await supabase
@@ -181,20 +174,13 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) {
         console.error('Error inserting friend to database:', error);
-        throw error;
+        return;
       }
 
-      console.log('Friend added to database successfully');
-
-      // Update Nostr (publish new kind:3 event)
-      await publishFollowList();
-      
       // Reload friends
       await loadFriendsFromCache();
-      toast.success('Friend added successfully');
     } catch (error) {
       console.error('Error adding friend:', error);
-      toast.error('Failed to add friend');
     }
   };
 
