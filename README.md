@@ -1,73 +1,15 @@
-# Welcome to your Lovable project
+I added onlien Status
 
-## Project info
+- Live player list - See who's currently online and recently active in the app.
 
-**URL**: https://lovable.dev/projects/ee98f4e5-f91c-4400-9c84-b94179f3ef1d
+👆 For now to see the function works i took the accounts follower list and tracked online status of the following lists people. 
+My idea is to change that code later to track a dedicated relay (or relays!) and a specific "kind" event to display online status related to people who are playing our games. Because our games will use custom event we can track that.
 
-## How can I edit this code?
+- Smart status indicators - Green dot for online (active within 15 minutes), yellow dot for recently active (within 24 hours)
 
-There are several ways of editing your application.
+- Smooth scrolling carousel - Browse through all online players with a swipe-friendly interface
 
-**Use Lovable**
+- Player profiles - Tap any player to see their profile and some extra we could add in future. (Message, Send sats, Invite to game)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ee98f4e5-f91c-4400-9c84-b94179f3ef1d) and start prompting.
+- Auto-refresh - The list updates every 2 minutes to show the latest activity.
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/ee98f4e5-f91c-4400-9c84-b94179f3ef1d) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
