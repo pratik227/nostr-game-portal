@@ -22,7 +22,9 @@ export type Database = {
           followed_picture: string | null
           followed_pubkey: string
           followed_website: string | null
+          friend_source: string
           id: string
+          is_favorite: boolean
           updated_at: string
           user_pubkey: string
         }
@@ -38,7 +40,9 @@ export type Database = {
           followed_picture?: string | null
           followed_pubkey: string
           followed_website?: string | null
+          friend_source?: string
           id?: string
+          is_favorite?: boolean
           updated_at?: string
           user_pubkey: string
         }
@@ -54,7 +58,68 @@ export type Database = {
           followed_picture?: string | null
           followed_pubkey?: string
           followed_website?: string | null
+          friend_source?: string
           id?: string
+          is_favorite?: boolean
+          updated_at?: string
+          user_pubkey?: string
+        }
+        Relationships: []
+      }
+      friend_circle_members: {
+        Row: {
+          added_by_pubkey: string
+          circle_id: string
+          created_at: string
+          id: string
+          member_pubkey: string
+        }
+        Insert: {
+          added_by_pubkey: string
+          circle_id: string
+          created_at?: string
+          id?: string
+          member_pubkey: string
+        }
+        Update: {
+          added_by_pubkey?: string
+          circle_id?: string
+          created_at?: string
+          id?: string
+          member_pubkey?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "friend_circle_members_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "friend_circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      friend_circles: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_pubkey: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_pubkey: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
           updated_at?: string
           user_pubkey?: string
         }

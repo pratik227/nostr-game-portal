@@ -16,10 +16,32 @@ export interface Friend {
   followed_nip05?: string;
   followed_lud16?: string;
   followed_website?: string;
+  is_favorite?: boolean;
+  friend_source?: string;
+}
+
+export interface FriendCircle {
+  id: string;
+  user_pubkey: string;
+  name: string;
+  color?: string;
+  created_at: string;
+  updated_at: string;
+  members?: Friend[];
+}
+
+export interface CircleMember {
+  id: string;
+  circle_id: string;
+  member_pubkey: string;
+  added_by_pubkey: string;
+  created_at: string;
 }
 
 export function useFriendsList(userPubkey: string) {
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [circles, setCircles] = useState<FriendCircle[]>([]);
+  const [circlesImIn, setCirclesImIn] = useState<FriendCircle[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -44,6 +66,73 @@ export function useFriendsList(userPubkey: string) {
       toast.error('Failed to load friends list');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load user's circles
+  const loadCircles = async () => {
+    try {
+      const { data: circlesData, error } = await supabase
+        .from('friend_circles')
+        .select(`
+          *,
+          friend_circle_members (
+            member_pubkey,
+            added_by_pubkey
+          )
+        `)
+        .eq('user_pubkey', userPubkey);
+
+      if (error) throw error;
+
+      // Process circles with member details
+      const circlesWithMembers = await Promise.all(
+        (circlesData || []).map(async (circle) => {
+          const memberPubkeys = circle.friend_circle_members.map(m => m.member_pubkey);
+          const memberDetails = friends.filter(friend => 
+            memberPubkeys.includes(friend.followed_pubkey)
+          );
+
+          return {
+            ...circle,
+            members: memberDetails
+          };
+        })
+      );
+
+      setCircles(circlesWithMembers);
+    } catch (error) {
+      console.error('Error loading circles:', error);
+    }
+  };
+
+  // Load circles user is a member of
+  const loadCirclesImIn = async () => {
+    try {
+      const { data: membershipData, error } = await supabase
+        .from('friend_circle_members')
+        .select(`
+          circle_id,
+          friend_circles (
+            id,
+            user_pubkey,
+            name,
+            color,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('member_pubkey', userPubkey);
+
+      if (error) throw error;
+
+      const circlesImInData = (membershipData || [])
+        .map(m => m.friend_circles)
+        .filter(Boolean);
+
+      setCirclesImIn(circlesImInData);
+    } catch (error) {
+      console.error('Error loading circles I am in:', error);
     }
   };
 
@@ -98,7 +187,8 @@ export function useFriendsList(userPubkey: string) {
               followed_banner: profile?.banner,
               followed_nip05: profile?.nip05,
               followed_lud16: profile?.lud16,
-              followed_website: profile?.website
+              followed_website: profile?.website,
+              friend_source: 'sync'
             });
 
           if (insertError) {
@@ -111,6 +201,7 @@ export function useFriendsList(userPubkey: string) {
 
       // Reload from cache
       await loadFriendsFromCache();
+      await loadCircles();
       toast.success('Friends list synced from Nostr');
     } catch (error) {
       console.error('Error syncing from Nostr:', error);
@@ -169,7 +260,9 @@ export function useFriendsList(userPubkey: string) {
           followed_banner: profile?.banner,
           followed_nip05: profile?.nip05,
           followed_lud16: profile?.lud16,
-          followed_website: profile?.website
+          followed_website: profile?.website,
+          friend_source: 'manual',
+          is_favorite: true // Auto-favorite manually added friends
         });
 
       if (error) {
@@ -201,11 +294,119 @@ export function useFriendsList(userPubkey: string) {
       
       // Reload friends
       await loadFriendsFromCache();
+      await loadCircles();
       toast.success('Friend removed successfully');
     } catch (error) {
       console.error('Error removing friend:', error);
       toast.error('Failed to remove friend');
     }
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async (friendId: string) => {
+    try {
+      const friend = friends.find(f => f.id === friendId);
+      if (!friend) return;
+
+      const { error } = await supabase
+        .from('follow_npub')
+        .update({ is_favorite: !friend.is_favorite })
+        .eq('id', friendId)
+        .eq('user_pubkey', userPubkey);
+
+      if (error) throw error;
+
+      await loadFriendsFromCache();
+      toast.success(friend.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    }
+  };
+
+  // Create a new circle
+  const createCircle = async (name: string, color?: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_circles')
+        .insert({
+          user_pubkey: userPubkey,
+          name: name.trim(),
+          color: color || null
+        });
+
+      if (error) throw error;
+
+      await loadCircles();
+      toast.success('Circle created successfully');
+    } catch (error) {
+      console.error('Error creating circle:', error);
+      toast.error('Failed to create circle');
+    }
+  };
+
+  // Add friend to circle
+  const addFriendToCircle = async (friendPubkey: string, circleId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_circle_members')
+        .insert({
+          circle_id: circleId,
+          member_pubkey: friendPubkey,
+          added_by_pubkey: userPubkey
+        });
+
+      if (error) throw error;
+
+      await loadCircles();
+      toast.success('Friend added to circle');
+    } catch (error) {
+      console.error('Error adding friend to circle:', error);
+      toast.error('Failed to add friend to circle');
+    }
+  };
+
+  // Remove friend from circle
+  const removeFriendFromCircle = async (friendPubkey: string, circleId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_circle_members')
+        .delete()
+        .eq('circle_id', circleId)
+        .eq('member_pubkey', friendPubkey);
+
+      if (error) throw error;
+
+      await loadCircles();
+      toast.success('Friend removed from circle');
+    } catch (error) {
+      console.error('Error removing friend from circle:', error);
+      toast.error('Failed to remove friend from circle');
+    }
+  };
+
+  // Delete a circle
+  const deleteCircle = async (circleId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_circles')
+        .delete()
+        .eq('id', circleId)
+        .eq('user_pubkey', userPubkey);
+
+      if (error) throw error;
+
+      await loadCircles();
+      toast.success('Circle deleted successfully');
+    } catch (error) {
+      console.error('Error deleting circle:', error);
+      toast.error('Failed to delete circle');
+    }
+  };
+
+  // Get favorites
+  const getFavorites = () => {
+    return friends.filter(friend => friend.is_favorite);
   };
 
   // Publish updated follow list to Nostr
@@ -249,12 +450,27 @@ export function useFriendsList(userPubkey: string) {
     }
   }, [userPubkey]);
 
+  useEffect(() => {
+    if (friends.length > 0) {
+      loadCircles();
+      loadCirclesImIn();
+    }
+  }, [friends]);
+
   return {
     friends,
+    circles,
+    circlesImIn,
     loading,
     syncing,
     addFriend,
     removeFriend,
-    syncFriendsFromNostr
+    syncFriendsFromNostr,
+    toggleFavorite,
+    createCircle,
+    addFriendToCircle,
+    removeFriendFromCircle,
+    deleteCircle,
+    getFavorites
   };
 }
