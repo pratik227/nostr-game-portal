@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnlineStatusDot } from './OnlineStatusDot';
-import { type Friend } from '@/hooks/useFriendsList';
+import { type Friend as OriginalFriend } from '@/hooks/useFriendsList';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   Gamepad2, 
@@ -26,6 +25,9 @@ interface FriendProfileModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Extend interface to ensure created_at exists for robust typing
+type Friend = OriginalFriend & { created_at?: string };
 
 type OnlineStatus = 'online' | 'recent' | 'offline';
 
@@ -335,8 +337,8 @@ export function FriendProfileModal({ friend, isOpen, onOpenChange }: FriendProfi
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-gray-900 text-sm">Friend Since</p>
                     <p className="text-xs text-gray-600">
-                      {/* Only display if property exists */}
-                      {'created_at' in friend && friend.created_at
+                      {/* Robust fix: check type and null before passing to Date */}
+                      {typeof friend.created_at === 'string' && friend.created_at
                         ? formatDistanceToNow(new Date(friend.created_at), { addSuffix: true })
                         : 'Unknown'}
                     </p>
