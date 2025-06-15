@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,7 +112,13 @@ export function MemberSelector({
   return (
     <div className="min-h-screen bg-white pb-24">
       {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 z-10">
+      <div 
+        className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 z-10"
+        style={{
+          borderTopWidth: '4px',
+          borderTopColor: circle.color || '#14b8a6'
+        }}
+      >
         <div className="flex items-center gap-3 mb-4">
           <Button
             variant="ghost"
@@ -124,7 +129,13 @@ export function MemberSelector({
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold text-gray-900">Add Members</h1>
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: circle.color || '#14b8a6' }}
+              />
+              <h1 className="text-xl font-semibold text-gray-900">Add Members</h1>
+            </div>
             <p className="text-sm text-gray-500">to {circle.name}</p>
           </div>
         </div>
@@ -253,7 +264,10 @@ export function MemberSelector({
           <Button
             onClick={handleAddSelected}
             disabled={addingMembers}
-            className="w-full bg-teal hover:bg-teal/90 h-12 shadow-lg"
+            className="w-full h-12 shadow-lg text-white"
+            style={{
+              backgroundColor: circle.color || '#14b8a6'
+            }}
           >
             <Check className="w-5 h-5 mr-2" />
             {addingMembers ? 'Adding...' : 

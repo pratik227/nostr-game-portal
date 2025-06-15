@@ -7,6 +7,7 @@ import { CircleDetailView } from './CircleDetailView';
 import { MemberSelector } from './MemberSelector';
 import { SwipeableCard } from './SwipeableCard';
 import { AvatarStack } from './AvatarStack';
+import { CircleColorPicker } from './CircleColorPicker';
 import { 
   RefreshCw, 
   Plus, 
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useFriendsList, type Friend, type FriendCircle } from '@/hooks/useFriendsList';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedFriendsSectionProps {
   userPubkey: string;
@@ -28,6 +30,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
   const [activeTab, setActiveTab] = useState<'favorites' | 'circles' | 'all'>('favorites');
   const [newFriendInput, setNewFriendInput] = useState('');
   const [newCircleName, setNewCircleName] = useState('');
+  const [newCircleColor, setNewCircleColor] = useState('#14b8a6'); // Default teal
   const [showCreateCircle, setShowCreateCircle] = useState(false);
   
   // Navigation state
@@ -64,8 +67,9 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
   const handleCreateCircle = async () => {
     if (!newCircleName.trim()) return;
-    await createCircle(newCircleName.trim());
+    await createCircle(newCircleName.trim(), newCircleColor);
     setNewCircleName('');
+    setNewCircleColor('#14b8a6');
     setShowCreateCircle(false);
   };
 
@@ -242,23 +246,38 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
         {showCreateCircle && (
           <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
-            <div className="flex gap-2">
+            <div className="space-y-4">
               <Input
                 placeholder="Circle name (e.g., Gaming Squad)"
                 value={newCircleName}
                 onChange={(e) => setNewCircleName(e.target.value)}
-                className="flex-1 border-gray-200 focus:border-teal focus:ring-teal/20"
+                className="border-gray-200 focus:border-teal focus:ring-teal/20"
               />
-              <Button onClick={handleCreateCircle} size="sm" className="bg-teal hover:bg-teal/90">
-                Create
-              </Button>
-              <Button 
-                onClick={() => setShowCreateCircle(false)} 
-                variant="outline" 
-                size="sm"
-              >
-                Cancel
-              </Button>
+              <CircleColorPicker
+                selectedColor={newCircleColor}
+                onColorSelect={setNewCircleColor}
+              />
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleCreateCircle} 
+                  size="sm" 
+                  className="bg-teal hover:bg-teal/90"
+                  disabled={!newCircleName.trim()}
+                >
+                  Create
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setShowCreateCircle(false);
+                    setNewCircleName('');
+                    setNewCircleColor('#14b8a6');
+                  }} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -276,10 +295,20 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
                 key={circle.id}
                 onClick={() => handleCircleClick(circle)}
                 className="w-full bg-white border border-gray-200 rounded-xl p-4 text-left hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm transition-all duration-200"
+                style={{
+                  borderLeftWidth: '4px',
+                  borderLeftColor: circle.color || '#14b8a6'
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 mb-2 truncate">{circle.name}</h4>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: circle.color || '#14b8a6' }}
+                      />
+                      <h4 className="font-semibold text-gray-900 truncate">{circle.name}</h4>
+                    </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <Users className="w-4 h-4" />

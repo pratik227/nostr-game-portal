@@ -501,18 +501,24 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Update a circle's name with controlled refresh
-  const updateCircle = async (circleId: string, name: string) => {
+  // Update a circle's name and color with controlled refresh
+  const updateCircle = async (circleId: string, name: string, color?: string) => {
     if (operationLoading) return;
     
     setOperationLoading(true);
     try {
+      const updateData: any = { 
+        name: name.trim(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (color) {
+        updateData.color = color;
+      }
+
       const { error } = await supabase
         .from('friend_circles')
-        .update({ 
-          name: name.trim(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', circleId)
         .eq('user_pubkey', userPubkey);
 
