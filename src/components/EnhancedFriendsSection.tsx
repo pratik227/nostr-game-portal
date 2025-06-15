@@ -85,30 +85,9 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
   const handleAddMembersToCircle = async (memberPubkeys: string[]) => {
     if (!selectedCircle) return;
 
-    let addedCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-
     for (const pubkey of memberPubkeys) {
-      const result = await addFriendToCircle(pubkey, selectedCircle.id);
-      if (result?.status === 'added') {
-        addedCount++;
-      } else if (result?.status === 'duplicate') {
-        skippedCount++;
-      } else {
-        errorCount++;
-      }
-    }
-
-    // Feedback for user
-    if (addedCount > 0) {
-      toast.success(`Added ${addedCount} to "${selectedCircle.name}".`);
-    }
-    if (skippedCount > 0) {
-      toast.info(`${skippedCount} already in "${selectedCircle.name}".`);
-    }
-    if (errorCount > 0) {
-      toast.error(`${errorCount} could not be added. Try again.`);
+      await addFriendToCircle(pubkey, selectedCircle.id);
+      // Each call of addFriendToCircle handles its own user feedback via toast
     }
 
     // Refresh circles and update selected circle
