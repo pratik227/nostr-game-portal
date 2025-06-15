@@ -33,22 +33,29 @@ export function MemberSelector({
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [newFriendInput, setNewFriendInput] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
+  const [addingMembers, setAddingMembers] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  // Get friends not already in the circle
-  const existingMemberPubkeys = new Set(
-    circle.members?.map(m => m.followed_pubkey) || []
-  );
-  
-  const availableFriends = friends.filter(
-    friend => !existingMemberPubkeys.has(friend.followed_pubkey)
+  // Get pubkeys of people already in this circle
+  const existingMemberPubkeys = useMemo(
+    () =>
+      new Set<string>(
+        (circle.members || []).map(m => m.followed_pubkey)
+      ),
+    [circle.members]
   );
 
-  // Filter friends based on search
+  // Filter to friends not already in this circle
+  const availableFriends = useMemo(
+    () => friends.filter(friend => !existingMemberPubkeys.has(friend.followed_pubkey)),
+    [friends, existingMemberPubkeys]
+  );
+
+  // Filtered by search query
   const filteredFriends = useMemo(() => {
     if (!searchQuery) return availableFriends;
-    
     const query = searchQuery.toLowerCase();
-    return availableFriends.filter(friend => 
+    return availableFriends.filter(friend =>
       friend.followed_display_name?.toLowerCase().includes(query) ||
       friend.followed_name?.toLowerCase().includes(query) ||
       friend.followed_nip05?.toLowerCase().includes(query) ||
@@ -56,12 +63,10 @@ export function MemberSelector({
     );
   }, [availableFriends, searchQuery]);
 
-  // Get selected friends for preview
-  const selectedFriends = friends.filter(friend => 
+  // Selected for preview
+  const selectedFriends = friends.filter(friend =>
     selectedMembers.has(friend.followed_pubkey)
   );
-
-  // Preview members (existing + selected)
   const previewMembers = [
     ...(circle.members || []),
     ...selectedFriends
@@ -77,22 +82,31 @@ export function MemberSelector({
     setSelectedMembers(newSelected);
   };
 
-  const handleAddSelected = () => {
-    if (selectedMembers.size > 0) {
-      onAddMembers(Array.from(selectedMembers));
+  // Handle add selected, with loading/error state
+  const handleAddSelected = async () => {
+    setAddingMembers(true);
+    setAddError(null);
+    try {
+      await onAddMembers(Array.from(selectedMembers));
+      setSelectedMembers(new Set());
       onBack();
+    } catch (e: any) {
+      setAddError(
+        e?.message || 'Error adding members. Please try again.'
+      );
+    } finally {
+      setAddingMembers(false);
     }
   };
 
   const handleAddNewFriend = async () => {
     if (!newFriendInput.trim()) return;
-    
     try {
       await onAddNewFriend(newFriendInput.trim());
       setNewFriendInput('');
       setShowAddNew(false);
-    } catch (error) {
-      console.error('Error adding new friend:', error);
+    } catch (error: any) {
+      setAddError(error?.message || 'Could not add/follow this pubkey.');
     }
   };
 
@@ -114,8 +128,6 @@ export function MemberSelector({
             <p className="text-sm text-gray-500">to {circle.name}</p>
           </div>
         </div>
-
-        {/* Preview Section */}
         {selectedMembers.size > 0 && (
           <div className="bg-teal/5 border border-teal/20 rounded-xl p-4 mb-4">
             <div className="flex items-center gap-3">
@@ -123,9 +135,9 @@ export function MemberSelector({
               <span className="text-sm font-medium text-teal-800">Preview with {selectedMembers.size} new members</span>
             </div>
             <div className="mt-3 flex items-center gap-3">
-              <AvatarStack 
-                members={previewMembers} 
-                size="md" 
+              <AvatarStack
+                members={previewMembers}
+                size="md"
                 maxDisplay={8}
               />
               <span className="text-sm text-gray-600">
@@ -134,8 +146,6 @@ export function MemberSelector({
             </div>
           </div>
         )}
-
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
@@ -145,8 +155,8 @@ export function MemberSelector({
             className="pl-10 border-gray-200 focus:border-teal focus:ring-teal/20"
           />
         </div>
+        {addError && <div className="text-red-600 mt-2 text-sm">{addError}</div>}
       </div>
-
       {/* Add New Friend Section */}
       <div className="px-4 py-4 border-b border-gray-100">
         {!showAddNew ? (
@@ -167,18 +177,19 @@ export function MemberSelector({
               className="flex-1 border-gray-200 focus:border-teal focus:ring-teal/20"
             />
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={handleAddNewFriend}
                 disabled={!newFriendInput.trim()}
                 className="flex-1 bg-teal hover:bg-teal/90"
               >
                 Follow & Add
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => {
                   setShowAddNew(false);
                   setNewFriendInput('');
+                  setAddError(null);
                 }}
               >
                 Cancel
@@ -187,7 +198,6 @@ export function MemberSelector({
           </div>
         )}
       </div>
-
       {/* Friends List */}
       <div className="px-4 flex-1 overflow-y-auto">
         {filteredFriends.length === 0 ? (
@@ -197,7 +207,7 @@ export function MemberSelector({
               {availableFriends.length === 0 ? 'All friends are already in this circle' : 'No friends found'}
             </h3>
             <p className="text-gray-500 text-center max-w-sm mx-auto">
-              {availableFriends.length === 0 
+              {availableFriends.length === 0
                 ? 'Add more friends to your list to add them to circles.'
                 : 'Try adjusting your search or add a new friend.'
               }
@@ -206,7 +216,7 @@ export function MemberSelector({
         ) : (
           <div className="py-4 space-y-1">
             {filteredFriends.map((friend) => (
-              <div 
+              <div
                 key={friend.id}
                 className={`flex items-center gap-3 py-3 px-3 rounded-xl border-2 transition-all duration-200 ${
                   selectedMembers.has(friend.followed_pubkey)
@@ -219,14 +229,12 @@ export function MemberSelector({
                   onCheckedChange={() => handleToggleMember(friend.followed_pubkey)}
                   className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
                 />
-                
                 <Avatar className="w-10 h-10 ring-2 ring-gray-100 shadow-sm">
                   <AvatarImage src={friend.followed_picture || ''} />
                   <AvatarFallback className="bg-gradient-to-br from-teal-50 to-blue-50 text-teal-700 font-medium">
                     {friend.followed_display_name?.[0] || friend.followed_name?.[0] || 'A'}
                   </AvatarFallback>
                 </Avatar>
-                
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-gray-900 truncate">
                     {friend.followed_display_name || friend.followed_name || 'Anonymous'}
@@ -240,16 +248,16 @@ export function MemberSelector({
           </div>
         )}
       </div>
-
-      {/* Bottom Action Button */}
       {selectedMembers.size > 0 && (
         <div className="sticky bottom-24 left-0 right-0 p-4 bg-white border-t border-gray-100">
           <Button
             onClick={handleAddSelected}
+            disabled={addingMembers}
             className="w-full bg-teal hover:bg-teal/90 h-12 shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
-            Add {selectedMembers.size} {selectedMembers.size === 1 ? 'Friend' : 'Friends'}
+            {addingMembers ? 'Adding...' : 
+              `Add ${selectedMembers.size} ${selectedMembers.size === 1 ? 'Friend' : 'Friends'}`}
           </Button>
         </div>
       )}

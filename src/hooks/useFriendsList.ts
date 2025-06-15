@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
@@ -411,12 +410,27 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Add friend to circle with controlled refresh
+  // Add friend to circle with controlled refresh and duplicate check
   const addFriendToCircle = async (friendPubkey: string, circleId: string) => {
     if (operationLoading) return;
-    
+
     setOperationLoading(true);
     try {
+      // Check if this friend is already a member of the circle
+      const { data: existing, error: checkError } = await supabase
+        .from('friend_circle_members')
+        .select('id')
+        .eq('circle_id', circleId)
+        .eq('member_pubkey', friendPubkey)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (existing) {
+        // User is already in this circle
+        toast.error('User is already a member of this circle');
+        return { status: 'duplicate' };
+      }
+
       const { error } = await supabase
         .from('friend_circle_members')
         .insert({
@@ -429,9 +443,11 @@ export function useFriendsList(userPubkey: string) {
 
       await refreshCircles();
       toast.success('Friend added to circle');
-    } catch (error) {
+      return { status: 'added' };
+    } catch (error: any) {
       console.error('Error adding friend to circle:', error);
-      toast.error('Failed to add friend to circle');
+      toast.error(error?.message || 'Failed to add friend to circle');
+      return { status: 'error', error };
     } finally {
       setOperationLoading(false);
     }
