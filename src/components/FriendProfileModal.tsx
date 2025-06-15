@@ -335,7 +335,10 @@ export function FriendProfileModal({ friend, isOpen, onOpenChange }: FriendProfi
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-gray-900 text-sm">Friend Since</p>
                     <p className="text-xs text-gray-600">
-                      {friend.created_at ? formatDistanceToNow(new Date(friend.created_at), { addSuffix: true }) : 'Unknown'}
+                      {/* Only display if property exists */}
+                      {'created_at' in friend && friend.created_at
+                        ? formatDistanceToNow(new Date(friend.created_at), { addSuffix: true })
+                        : 'Unknown'}
                     </p>
                   </div>
                 </div>

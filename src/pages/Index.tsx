@@ -155,7 +155,7 @@ export default function Index() {
     setIsLoggedIn(false)
     setPubkey('')
     localStorage.removeItem('userPubkey') // Clear stored pubkey
-    setCurrentPage('dashboard')
+    setCurrentPage('dashboard') // Always send user to dashboard after logout
     setProfileReloadKey(0)
     setWasLoggedInBefore(false)
     console.log('User logged out')

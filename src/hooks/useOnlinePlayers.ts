@@ -26,28 +26,48 @@ export function useOnlinePlayers(userPubkey: string) {
     if (!userPubkey) return;
 
     try {
-      // Get all users who were active in the last 24 hours
+      // 1. Get the list of pubkeys that the user is following (their "friends"/follows)
+      const { data: follows, error: followErr } = await supabase
+        .from('follow_npub')
+        .select('followed_pubkey')
+        .eq('user_pubkey', userPubkey);
+
+      if (followErr || !follows) {
+        setOnlinePlayers([]);
+        return;
+      }
+
+      const followedPubkeys = follows.map(f => f.followed_pubkey);
+
+      if (followedPubkeys.length === 0) {
+        setOnlinePlayers([]);
+        return;
+      }
+
+      // 2. Query the users table ONLY for these followed pubkeys (friends)
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      
+
       const { data: onlineUsersData } = await supabase
         .from('users')
         .select('id, pubkey, npub, name, display_name, picture, last_seen_at, about, nip05, lud16, website, banner')
         .not('last_seen_at', 'is', null)
         .gte('last_seen_at', twentyFourHoursAgo)
+        .in('pubkey', followedPubkeys)
         .order('last_seen_at', { ascending: false })
         .limit(50);
 
-      if (!onlineUsersData) return;
+      if (!onlineUsersData) {
+        setOnlinePlayers([]);
+        return;
+      }
 
       const now = Date.now();
       const fifteenMinutesAgo = now - 15 * 60 * 1000;
 
-      // Process users and determine their status
       const players: OnlinePlayer[] = onlineUsersData
         .filter(user => user.pubkey !== userPubkey) // Don't include current user
         .map(user => {
           const lastSeenTime = new Date(user.last_seen_at!).getTime();
-          
           return {
             id: user.id,
             pubkey: user.pubkey,
@@ -64,14 +84,12 @@ export function useOnlinePlayers(userPubkey: string) {
             status: (lastSeenTime > fifteenMinutesAgo ? 'online' : 'recent') as 'online' | 'recent'
           };
         })
-        // Sort by recency
-        .sort((a, b) => {
-          return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
-        });
+        .sort((a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime());
 
       setOnlinePlayers(players);
     } catch (error) {
       console.error('Error loading online players:', error);
+      setOnlinePlayers([]);
     } finally {
       setLoading(false);
     }
@@ -83,10 +101,9 @@ export function useOnlinePlayers(userPubkey: string) {
 
   useEffect(() => {
     loadOnlinePlayers();
-    
-    // Refresh every 2 minutes
+
     const interval = setInterval(loadOnlinePlayers, 2 * 60 * 1000);
-    
+
     return () => clearInterval(interval);
   }, [loadOnlinePlayers]);
 
