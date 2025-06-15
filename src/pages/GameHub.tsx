@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play, Plus, RefreshCw, MessageCircle, Trash2 } from 'lucide-react';
 import FloatingActionMenu from '@/components/FloatingActionMenu';
 import { Profile } from '@/components/Profile';
@@ -130,76 +131,99 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   );
 
   const renderFriends = () => (
-    <div className="p-4 pb-24">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold text-deep-sea tracking-tight">Friends</h1>
+    <div className="min-h-screen bg-white">
+      {/* Clean Header */}
+      <div className="px-6 py-8 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-semibold text-gray-900">Friends</h1>
+            <span className="text-sm text-gray-500 font-medium">
+              {friends.length} {friends.length === 1 ? 'friend' : 'friends'}
+            </span>
+          </div>
           <Button
             onClick={syncFriendsFromNostr}
             disabled={syncing}
             variant="outline"
             size="sm"
-            className="flex items-center gap-2"
+            className="border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300"
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sync
           </Button>
         </div>
 
-        {/* Add Friend */}
-        <div className="flex gap-2 mb-6">
+        {/* Clean Add Friend Section */}
+        <div className="flex gap-3">
           <Input
-            placeholder="Enter pubkey or npub..."
+            placeholder="Add friend by pubkey or npub..."
             value={newFriendInput}
             onChange={(e) => setNewFriendInput(e.target.value)}
-            className="flex-1"
+            className="flex-1 border-gray-200 focus:border-teal focus:ring-teal/20 placeholder:text-gray-400"
           />
-          <Button onClick={handleAddFriend} className="bg-teal hover:bg-teal/90">
+          <Button 
+            onClick={handleAddFriend} 
+            disabled={!newFriendInput.trim()}
+            className="bg-teal hover:bg-teal/90 text-white px-6"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add
           </Button>
         </div>
       </div>
 
-      {loading ? (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="h-20 bg-gray-200 rounded-xl"></div>
+      {/* Friends List */}
+      <div className="px-6 pb-24">
+        {loading ? (
+          <div className="space-y-4 mt-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-4">
+                <div className="w-12 h-12 bg-gray-100 rounded-full animate-pulse"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-32 animate-pulse"></div>
+                  <div className="h-3 bg-gray-100 rounded w-48 animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : friends.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-gray-300" />
             </div>
-          ))}
-        </div>
-      ) : friends.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-deep-sea mb-2">No Friends Yet</h2>
-          <p className="text-steel-blue mb-4">Add friends by their pubkey or npub to start connecting with them!</p>
-          <Button onClick={syncFriendsFromNostr} className="bg-teal hover:bg-teal/90">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Sync from Nostr
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {friends.map((friend) => (
-            <Card key={friend.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
+            <h2 className="text-lg font-medium text-gray-900 mb-2">No friends yet</h2>
+            <p className="text-gray-500 text-center max-w-sm mb-6">
+              Connect with other players by adding their pubkey or npub above, or sync your existing Nostr follows.
+            </p>
+            <Button 
+              onClick={syncFriendsFromNostr} 
+              variant="outline"
+              className="border-teal text-teal hover:bg-teal hover:text-white"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Sync from Nostr
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-6">
+            {friends.map((friend, index) => (
+              <div key={friend.id}>
+                <div className="flex items-center gap-4 py-4">
                   <Dialog>
                     <DialogTrigger asChild>
-                      <button className="flex items-center gap-4 flex-1 text-left">
-                        <Avatar className="w-12 h-12">
+                      <button className="flex items-center gap-4 flex-1 text-left focus:outline-none focus:ring-2 focus:ring-teal/20 focus:ring-offset-2 rounded-lg p-2 -m-2">
+                        <Avatar className="w-12 h-12 ring-1 ring-gray-100">
                           <AvatarImage src={friend.followed_picture || ''} />
-                          <AvatarFallback className="bg-steel-blue text-white">
-                            <User className="w-6 h-6" />
+                          <AvatarFallback className="bg-gray-50 text-gray-600 font-medium">
+                            {friend.followed_display_name?.[0] || friend.followed_name?.[0] || 'A'}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-deep-sea">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 truncate">
                             {friend.followed_display_name || friend.followed_name || 'Anonymous'}
                           </h3>
-                          <p className="text-sm text-steel-blue">
-                            {friend.followed_nip05 || `${friend.followed_npub.slice(0, 16)}...`}
+                          <p className="text-sm text-gray-500 truncate">
+                            {friend.followed_nip05 || `${friend.followed_npub.slice(0, 20)}...`}
                           </p>
                         </div>
                       </button>
@@ -215,22 +239,23 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
                     </DialogContent>
                   </Dialog>
 
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => removeFriend(friend.id)}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removeFriend(friend.id)}
+                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                {index < friends.length - 1 && (
+                  <Separator className="bg-gray-100" />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 
