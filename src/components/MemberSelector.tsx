@@ -45,7 +45,7 @@ export function MemberSelector({
 
   // Filter friends based on search
   const filteredFriends = useMemo(() => {
-    if (!searchQuery) return availabl eFriends;
+    if (!searchQuery) return availableFriends;
     
     const query = searchQuery.toLowerCase();
     return availableFriends.filter(friend => 
