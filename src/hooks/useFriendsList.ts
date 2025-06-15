@@ -40,6 +40,15 @@ export interface CircleMember {
   created_at: string;
 }
 
+// Helper function to chunk arrays into smaller batches
+const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
 export function useFriendsList(userPubkey: string) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [circles, setCircles] = useState<FriendCircle[]>([]);
@@ -84,17 +93,45 @@ export function useFriendsList(userPubkey: string) {
         return [];
       }
       
-      // Get user data (including last_seen_at) for these friends
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('pubkey, last_seen_at')
-        .in('pubkey', friendPubkeys);
+      console.log(`Fetching user data for ${friendPubkeys.length} friends in batches`);
+      
+      // Split pubkeys into batches to avoid URL length limits
+      const BATCH_SIZE = 50; // Safe batch size to avoid URL length issues
+      const pubkeyBatches = chunkArray(friendPubkeys, BATCH_SIZE);
+      
+      // Fetch user data in batches
+      const allUsersData: any[] = [];
+      
+      for (let i = 0; i < pubkeyBatches.length; i++) {
+        const batch = pubkeyBatches[i];
+        console.log(`Processing batch ${i + 1}/${pubkeyBatches.length} with ${batch.length} pubkeys`);
+        
+        try {
+          const { data: batchUsersData, error: batchError } = await supabase
+            .from('users')
+            .select('pubkey, last_seen_at')
+            .in('pubkey', batch);
 
-      if (usersError) throw usersError;
+          if (batchError) {
+            console.error(`Error in batch ${i + 1}:`, batchError);
+            // Continue with other batches even if one fails
+            continue;
+          }
+
+          if (batchUsersData) {
+            allUsersData.push(...batchUsersData);
+          }
+        } catch (batchError) {
+          console.error(`Failed to process batch ${i + 1}:`, batchError);
+          // Continue with other batches
+        }
+      }
+
+      console.log(`Successfully fetched user data for ${allUsersData.length} out of ${friendPubkeys.length} friends`);
 
       // Merge the data
       const mergedFriends = followData.map(friend => {
-        const userData = usersData?.find(u => u.pubkey === friend.followed_pubkey);
+        const userData = allUsersData.find(u => u.pubkey === friend.followed_pubkey);
         return {
           ...friend,
           last_seen_at: userData?.last_seen_at || null,
@@ -109,8 +146,17 @@ export function useFriendsList(userPubkey: string) {
       
       return mergedFriends as Friend[];
     } catch (error) {
-      console.error('Error loading friends from cache:', error);
-      toast.error('Failed to load friends list');
+      console.error('Error loading friends from database:', error);
+      
+      // Provide more specific error messaging
+      if (error?.message?.includes('413') || error?.message?.includes('414')) {
+        toast.error('Friend list too large to load at once. Please try refreshing.');
+      } else if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        toast.error('Network error loading friends. Please check your connection.');
+      } else {
+        toast.error('Failed to load friends list. Please try again.');
+      }
+      
       return [];
     }
   }, [userPubkey, cacheKey]);
