@@ -132,6 +132,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
+          last_seen_at: string | null
           lud16: string | null
           name: string | null
           nip05: string | null
@@ -147,6 +148,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          last_seen_at?: string | null
           lud16?: string | null
           name?: string | null
           nip05?: string | null
@@ -162,6 +164,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          last_seen_at?: string | null
           lud16?: string | null
           name?: string | null
           nip05?: string | null
@@ -178,7 +181,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_last_seen: {
+        Args: { p_pubkey: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

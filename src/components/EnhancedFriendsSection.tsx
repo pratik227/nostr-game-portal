@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -14,11 +14,14 @@ import {
   Star, 
   Users, 
   UserCheck, 
-  ArrowRight
+  ArrowRight,
+  CircleDot
 } from 'lucide-react';
 import { useFriendsList, type Friend, type FriendCircle } from '@/hooks/useFriendsList';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { formatPubkey } from '@/lib/nostr';
 
 interface EnhancedFriendsSectionProps {
   userPubkey: string;
@@ -26,8 +29,38 @@ interface EnhancedFriendsSectionProps {
 
 type ViewState = 'main' | 'circle-detail' | 'member-selector';
 
+type OnlineStatus = 'online' | 'recent' | 'offline';
+
+const getStatus = (lastSeenAt: string | null | undefined): OnlineStatus => {
+  if (!lastSeenAt) return 'offline';
+  const lastSeenDate = new Date(lastSeenAt);
+  const now = new Date();
+  const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60);
+
+  if (diffMinutes < 15) return 'online';
+  if (diffMinutes < 24 * 60) return 'recent';
+  return 'offline';
+};
+
+const OnlineStatusIndicator = ({ status }: { status: OnlineStatus }) => {
+  const statusConfig = {
+    online: { color: 'text-green-500', label: 'Online' },
+    recent: { color: 'text-yellow-500', label: 'Recently Active' },
+    offline: { color: 'text-gray-400', label: 'Offline' },
+  };
+
+  if (status === 'offline') return null;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <CircleDot className={`w-3.5 h-3.5 ${statusConfig[status].color}`} />
+      <span className={`text-sm ${statusConfig[status].color}`}>{statusConfig[status].label}</span>
+    </div>
+  );
+};
+
 export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionProps) {
-  const [activeTab, setActiveTab] = useState<'favorites' | 'circles' | 'all'>('favorites');
+  const [activeTab, setActiveTab] = useState<'favorites' | 'active' | 'circles' | 'all'>('favorites');
   const [newFriendInput, setNewFriendInput] = useState('');
   const [newCircleName, setNewCircleName] = useState('');
   const [newCircleColor, setNewCircleColor] = useState('#14b8a6'); // Default teal
@@ -58,6 +91,18 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
   } = useFriendsList(userPubkey);
 
   const favorites = getFavorites();
+
+  const activeFriends = useMemo(() => {
+    return friends
+      .map(friend => ({ ...friend, status: getStatus(friend.last_seen_at) }))
+      .filter(friend => friend.status !== 'offline')
+      .sort((a, b) => {
+        if (a.status === 'online' && b.status !== 'online') return -1;
+        if (a.status !== 'online' && b.status === 'online') return 1;
+        // Both recent, sort by last_seen_at
+        return new Date(b.last_seen_at!).getTime() - new Date(a.last_seen_at!).getTime();
+      });
+  }, [friends]);
 
   const handleAddFriend = async () => {
     if (!newFriendInput.trim()) return;
@@ -165,6 +210,12 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
       count: favorites.length 
     },
     { 
+      id: 'active', 
+      label: 'Active', 
+      icon: <CircleDot className="w-4 h-4" />,
+      count: activeFriends.length 
+    },
+    { 
       id: 'circles', 
       label: 'Circles', 
       icon: <Users className="w-4 h-4" />, 
@@ -200,6 +251,43 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
                 onAddToCircle={addFriendToCircle}
               />
               {index < favorites.length - 1 && <Separator />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderActive = () => (
+    <div className="space-y-4">
+      {activeFriends.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <CircleDot className="w-12 h-12 text-gray-300 mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No active friends</h3>
+          <p className="text-gray-500 text-center max-w-sm">
+            Friends who are online or recently active will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {activeFriends.map((friend, index) => (
+            <div key={friend.id}>
+              <div className="w-full bg-white p-4 text-left transition-all duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarImage src={friend.followed_picture} alt={friend.followed_name} />
+                      <AvatarFallback>{friend.followed_name?.charAt(0) || '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 truncate">{friend.followed_display_name || friend.followed_name}</div>
+                      <div className="text-sm text-gray-500 truncate">{formatPubkey(friend.followed_pubkey)}</div>
+                    </div>
+                  </div>
+                  <OnlineStatusIndicator status={friend.status as OnlineStatus} />
+                </div>
+              </div>
+              {index < activeFriends.length - 1 && <Separator />}
             </div>
           ))}
         </div>
@@ -370,6 +458,8 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     switch (activeTab) {
       case 'favorites':
         return renderFavorites();
+      case 'active':
+        return renderActive();
       case 'circles':
         return renderCircles();
       case 'all':
@@ -425,7 +515,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
         <AppleSegmentedControl
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as 'favorites' | 'circles' | 'all')}
+          onTabChange={(tabId) => setActiveTab(tabId as 'favorites' | 'active' | 'circles' | 'all')}
         />
       </div>
 

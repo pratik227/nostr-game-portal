@@ -18,6 +18,7 @@ export interface Friend {
   followed_website?: string;
   is_favorite?: boolean;
   friend_source?: string;
+  last_seen_at?: string | null; // Added to track activity
 }
 
 export interface FriendCircle {
@@ -50,19 +51,41 @@ export function useFriendsList(userPubkey: string) {
   const loadFriendsFromCache = useCallback(async () => {
     console.log('Loading friends from cache for pubkey:', userPubkey);
     try {
-      const { data, error } = await supabase
+      // 1. Get base friend data from follow_npub
+      const { data: followData, error: followError } = await supabase
         .from('follow_npub')
         .select('*')
         .eq('user_pubkey', userPubkey);
 
-      if (error) {
-        console.error('Supabase error loading friends:', error);
-        throw error;
-      }
+      if (followError) throw followError;
+      if (!followData) return [];
 
-      console.log('Loaded friends from cache:', data);
-      setFriends(data || []);
-      return data || [];
+      const friendPubkeys = followData.map(f => f.followed_pubkey);
+      if (friendPubkeys.length === 0) {
+        setFriends([]);
+        return [];
+      }
+      
+      // 2. Get user data (including last_seen_at) for these friends
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('pubkey, last_seen_at')
+        .in('pubkey', friendPubkeys);
+
+      if (usersError) throw usersError;
+
+      // 3. Merge the data
+      const mergedFriends = followData.map(friend => {
+        const userData = usersData?.find(u => u.pubkey === friend.followed_pubkey);
+        return {
+          ...friend,
+          last_seen_at: userData?.last_seen_at || null,
+        };
+      });
+
+      console.log('Loaded and merged friends from cache:', mergedFriends);
+      setFriends(mergedFriends as Friend[]);
+      return mergedFriends as Friend[];
     } catch (error) {
       console.error('Error loading friends from cache:', error);
       toast.error('Failed to load friends list');
@@ -571,6 +594,42 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
+  // Nostr activity tracker
+  useEffect(() => {
+    if (!friends.length) return;
+
+    const friendPubkeys = friends.map(f => f.followed_pubkey);
+    if (friendPubkeys.length === 0) return;
+
+    const sub = pool.subscribeMany(
+      [...DEFAULT_RELAYS, 'wss://relay.damus.io'],
+      [{ kinds: [31337], authors: friendPubkeys }],
+      {
+        onevent(event) {
+          // Fire-and-forget update. Periodic refresh will catch changes.
+          supabase.rpc('update_last_seen', { p_pubkey: event.pubkey })
+            .then(({ error }) => {
+              if (error) console.error(`Error updating last_seen for ${event.pubkey}:`, error);
+            });
+        },
+      }
+    );
+
+    return () => sub.close();
+  }, [friends]);
+
+  // Periodic refresh for friend statuses
+  useEffect(() => {
+    if (userPubkey) {
+      const interval = setInterval(() => {
+        console.log('Periodically refreshing friends list for status updates...');
+        refreshFriends();
+      }, 60 * 1000); // Refresh every minute
+
+      return () => clearInterval(interval);
+    }
+  }, [userPubkey, refreshFriends]);
+
   // Initial load only - no automatic refresh
   useEffect(() => {
     if (userPubkey) {
@@ -587,7 +646,7 @@ export function useFriendsList(userPubkey: string) {
       };
       initializeData();
     }
-  }, [userPubkey]); // Only userPubkey dependency - no refresh functions
+  }, [userPubkey, loadFriendsFromCache, loadCircles, loadCirclesImIn]);
 
   return {
     friends,
