@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
 import * as nip19 from 'nostr-tools/nip19';
 import { toast } from 'sonner';
+import { sessionCache } from '@/lib/sessionCache';
 
 export interface Friend {
   id: string;
@@ -18,7 +19,7 @@ export interface Friend {
   followed_website?: string;
   is_favorite?: boolean;
   friend_source?: string;
-  last_seen_at?: string | null; // Added to track activity
+  last_seen_at?: string | null;
 }
 
 export interface FriendCircle {
@@ -46,12 +47,28 @@ export function useFriendsList(userPubkey: string) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
+  
+  // Track if data has been loaded this session
+  const initialLoadRef = useRef(false);
+  const cacheKey = `friends_${userPubkey}`;
+  const circlesKey = `circles_${userPubkey}`;
 
-  // Load friends from Supabase cache - stable function
-  const loadFriendsFromCache = useCallback(async () => {
-    console.log('Loading friends from cache for pubkey:', userPubkey);
+  // Load friends from cache first, then database if needed
+  const loadFriendsFromCache = useCallback(async (forceRefresh = false) => {
+    console.log('Loading friends - force refresh:', forceRefresh);
+    
+    // Try session cache first (unless force refresh)
+    if (!forceRefresh && sessionCache.has(cacheKey)) {
+      const cachedFriends = sessionCache.get<Friend[]>(cacheKey);
+      if (cachedFriends) {
+        console.log('Using cached friends data:', cachedFriends.length);
+        setFriends(cachedFriends);
+        return cachedFriends;
+      }
+    }
+
     try {
-      // 1. Get base friend data from follow_npub
+      // Get base friend data from follow_npub
       const { data: followData, error: followError } = await supabase
         .from('follow_npub')
         .select('*')
@@ -63,10 +80,11 @@ export function useFriendsList(userPubkey: string) {
       const friendPubkeys = followData.map(f => f.followed_pubkey);
       if (friendPubkeys.length === 0) {
         setFriends([]);
+        sessionCache.set(cacheKey, []);
         return [];
       }
       
-      // 2. Get user data (including last_seen_at) for these friends
+      // Get user data (including last_seen_at) for these friends
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('pubkey, last_seen_at')
@@ -74,7 +92,7 @@ export function useFriendsList(userPubkey: string) {
 
       if (usersError) throw usersError;
 
-      // 3. Merge the data
+      // Merge the data
       const mergedFriends = followData.map(friend => {
         const userData = usersData?.find(u => u.pubkey === friend.followed_pubkey);
         return {
@@ -83,18 +101,32 @@ export function useFriendsList(userPubkey: string) {
         };
       });
 
-      console.log('Loaded and merged friends from cache:', mergedFriends);
+      console.log('Loaded friends from database:', mergedFriends.length);
       setFriends(mergedFriends as Friend[]);
+      
+      // Cache the results for 10 minutes
+      sessionCache.set(cacheKey, mergedFriends, 10 * 60 * 1000);
+      
       return mergedFriends as Friend[];
     } catch (error) {
       console.error('Error loading friends from cache:', error);
       toast.error('Failed to load friends list');
       return [];
     }
-  }, [userPubkey]);
+  }, [userPubkey, cacheKey]);
 
-  // Load user's circles - stable function with friends parameter
-  const loadCircles = useCallback(async (friendsData?: Friend[]) => {
+  // Load circles with caching
+  const loadCircles = useCallback(async (friendsData?: Friend[], forceRefresh = false) => {
+    // Try session cache first
+    if (!forceRefresh && sessionCache.has(circlesKey)) {
+      const cachedCircles = sessionCache.get<FriendCircle[]>(circlesKey);
+      if (cachedCircles) {
+        console.log('Using cached circles data:', cachedCircles.length);
+        setCircles(cachedCircles);
+        return cachedCircles;
+      }
+    }
+
     try {
       const { data: circlesData, error } = await supabase
         .from('friend_circles')
@@ -109,10 +141,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      // Use provided friends data or current state
       const currentFriends = friendsData || friends;
 
-      // Process circles with member details
       const circlesWithMembers = await Promise.all(
         (circlesData || []).map(async (circle) => {
           const memberPubkeys = circle.friend_circle_members.map(m => m.member_pubkey);
@@ -127,15 +157,20 @@ export function useFriendsList(userPubkey: string) {
         })
       );
 
+      console.log('Loaded circles from database:', circlesWithMembers.length);
       setCircles(circlesWithMembers);
+      
+      // Cache circles for 5 minutes
+      sessionCache.set(circlesKey, circlesWithMembers, 5 * 60 * 1000);
+      
       return circlesWithMembers;
     } catch (error) {
       console.error('Error loading circles:', error);
       return [];
     }
-  }, [userPubkey]); // Removed friends dependency
+  }, [userPubkey, circlesKey, friends]);
 
-  // Load circles user is a member of - stable function
+  // Load circles user is a member of
   const loadCirclesImIn = useCallback(async () => {
     try {
       const { data: membershipData, error } = await supabase
@@ -167,24 +202,30 @@ export function useFriendsList(userPubkey: string) {
     }
   }, [userPubkey]);
 
-  // Controlled refresh functions - only call when needed
-  const refreshFriends = useCallback(async () => {
-    const updatedFriends = await loadFriendsFromCache();
-    await loadCircles(updatedFriends);
+  // Optimized refresh functions
+  const refreshFriends = useCallback(async (forceRefresh = false) => {
+    const updatedFriends = await loadFriendsFromCache(forceRefresh);
+    await loadCircles(updatedFriends, forceRefresh);
     return updatedFriends;
   }, [loadFriendsFromCache, loadCircles]);
 
-  const refreshCircles = useCallback(async () => {
-    const updatedCircles = await loadCircles();
+  const refreshCircles = useCallback(async (forceRefresh = false) => {
+    const updatedCircles = await loadCircles(undefined, forceRefresh);
     return updatedCircles;
   }, [loadCircles]);
 
-  const refreshAll = useCallback(async () => {
-    const updatedFriends = await loadFriendsFromCache();
-    const updatedCircles = await loadCircles(updatedFriends);
+  const refreshAll = useCallback(async (forceRefresh = false) => {
+    const updatedFriends = await loadFriendsFromCache(forceRefresh);
+    const updatedCircles = await loadCircles(updatedFriends, forceRefresh);
     await loadCirclesImIn();
     return { friends: updatedFriends, circles: updatedCircles };
   }, [loadFriendsFromCache, loadCircles, loadCirclesImIn]);
+
+  // Invalidate cache helper
+  const invalidateCache = useCallback(() => {
+    sessionCache.invalidate(cacheKey);
+    sessionCache.invalidate(circlesKey);
+  }, [cacheKey, circlesKey]);
 
   // Sync friends from Nostr (kind:3 events)
   const syncFriendsFromNostr = async () => {
@@ -249,8 +290,9 @@ export function useFriendsList(userPubkey: string) {
         }
       }
 
-      // Explicit refresh only after sync
-      await refreshAll();
+      // Invalidate cache and force refresh
+      invalidateCache();
+      await refreshAll(true);
       toast.success('Friends list synced from Nostr');
     } catch (error) {
       console.error('Error syncing from Nostr:', error);
@@ -260,10 +302,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Add a friend with controlled refresh
+  // Add a friend with cache invalidation
   const addFriend = async (pubkeyOrNpub: string) => {
     console.log('Adding friend:', pubkeyOrNpub);
-    if (operationLoading) return; // Prevent duplicate operations
+    if (operationLoading) return;
     
     setOperationLoading(true);
     try {
@@ -282,7 +324,7 @@ export function useFriendsList(userPubkey: string) {
         }
       }
 
-      // Check if friend already exists for this user_pubkey
+      // Check if friend already exists
       const { data: existingFriend } = await supabase
         .from('follow_npub')
         .select('id')
@@ -315,7 +357,7 @@ export function useFriendsList(userPubkey: string) {
           followed_lud16: profile?.lud16,
           followed_website: profile?.website,
           friend_source: 'manual',
-          is_favorite: true // Auto-favorite manually added friends
+          is_favorite: true
         });
 
       if (error) {
@@ -324,8 +366,9 @@ export function useFriendsList(userPubkey: string) {
         return;
       }
 
-      // Controlled refresh only after successful add
-      await refreshFriends();
+      // Invalidate cache and refresh
+      invalidateCache();
+      await refreshFriends(true);
       toast.success('Friend added successfully');
     } catch (error) {
       console.error('Error adding friend:', error);
@@ -350,11 +393,10 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      // Update Nostr (publish new kind:3 event)
       await publishFollowList();
       
-      // Controlled refresh only after successful removal
-      await refreshAll();
+      invalidateCache();
+      await refreshAll(true);
       toast.success('Friend removed successfully');
     } catch (error) {
       console.error('Error removing friend:', error);
@@ -398,6 +440,8 @@ export function useFriendsList(userPubkey: string) {
         throw error;
       }
 
+      // Update cache
+      invalidateCache();
       toast.success(newFavoriteStatus ? 'Added to favorites' : 'Removed from favorites');
     } catch (error) {
       console.error('Error toggling favorite:', error);
@@ -423,7 +467,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      await refreshCircles();
+      invalidateCache();
+      await refreshCircles(true);
       toast.success('Circle created successfully');
     } catch (error) {
       console.error('Error creating circle:', error);
@@ -464,7 +509,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      await refreshCircles();
+      invalidateCache();
+      await refreshCircles(true);
       toast.success('Friend added to circle');
     } catch (error: any) {
       console.error('Error adding friend to circle:', error);
@@ -488,7 +534,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      await refreshCircles();
+      invalidateCache();
+      await refreshCircles(true);
       toast.success('Friend removed from circle');
     } catch (error) {
       console.error('Error removing friend from circle:', error);
@@ -512,7 +559,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      await refreshCircles();
+      invalidateCache();
+      await refreshCircles(true);
       toast.success('Circle deleted successfully');
     } catch (error) {
       console.error('Error deleting circle:', error);
@@ -545,7 +593,8 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
-      await refreshCircles();
+      invalidateCache();
+      await refreshCircles(true);
       toast.success('Circle updated successfully');
     } catch (error) {
       console.error('Error updating circle:', error);
@@ -568,7 +617,6 @@ export function useFriendsList(userPubkey: string) {
         return;
       }
 
-      // Get current friends from cache
       const { data: currentFriends } = await supabase
         .from('follow_npub')
         .select('followed_pubkey')
@@ -576,7 +624,6 @@ export function useFriendsList(userPubkey: string) {
 
       if (!currentFriends) return;
 
-      // Create kind:3 event
       const event = {
         kind: 3,
         created_at: Math.floor(Date.now() / 1000),
@@ -585,7 +632,6 @@ export function useFriendsList(userPubkey: string) {
         pubkey: userPubkey
       };
 
-      // Sign and publish
       const signedEvent = await window.nostr.signEvent(event);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
       console.log('Published follow list to Nostr');
@@ -594,7 +640,7 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Nostr activity tracker
+  // Background activity updates (less frequent)
   useEffect(() => {
     if (!friends.length) return;
 
@@ -606,7 +652,7 @@ export function useFriendsList(userPubkey: string) {
       [{ kinds: [31337], authors: friendPubkeys }],
       {
         onevent(event) {
-          // Fire-and-forget update. Periodic refresh will catch changes.
+          // Background update only
           supabase.rpc('update_last_seen', { p_pubkey: event.pubkey })
             .then(({ error }) => {
               if (error) console.error(`Error updating last_seen for ${event.pubkey}:`, error);
@@ -618,21 +664,22 @@ export function useFriendsList(userPubkey: string) {
     return () => sub.close();
   }, [friends]);
 
-  // Periodic refresh for friend statuses
+  // Reduced frequency refresh for status updates
   useEffect(() => {
-    if (userPubkey) {
+    if (userPubkey && initialLoadRef.current) {
       const interval = setInterval(() => {
-        console.log('Periodically refreshing friends list for status updates...');
-        refreshFriends();
-      }, 60 * 1000); // Refresh every minute
+        console.log('Background refresh for activity status...');
+        // Only refresh friends data, not full reload
+        loadFriendsFromCache(true);
+      }, 5 * 60 * 1000); // Every 5 minutes instead of 1
 
       return () => clearInterval(interval);
     }
-  }, [userPubkey, refreshFriends]);
+  }, [userPubkey, loadFriendsFromCache]);
 
-  // Initial load only - no automatic refresh
+  // Initial load - only once per session
   useEffect(() => {
-    if (userPubkey) {
+    if (userPubkey && !initialLoadRef.current) {
       console.log('Initial load for userPubkey:', userPubkey);
       const initializeData = async () => {
         setLoading(true);
@@ -640,6 +687,7 @@ export function useFriendsList(userPubkey: string) {
           const friendsData = await loadFriendsFromCache();
           await loadCircles(friendsData);
           await loadCirclesImIn();
+          initialLoadRef.current = true;
         } finally {
           setLoading(false);
         }
@@ -667,6 +715,7 @@ export function useFriendsList(userPubkey: string) {
     getFavorites,
     refreshFriends,
     refreshCircles,
-    refreshAll
+    refreshAll,
+    invalidateCache
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -63,7 +63,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
   const [activeTab, setActiveTab] = useState<'favorites' | 'active' | 'circles' | 'all'>('favorites');
   const [newFriendInput, setNewFriendInput] = useState('');
   const [newCircleName, setNewCircleName] = useState('');
-  const [newCircleColor, setNewCircleColor] = useState('#14b8a6'); // Default teal
+  const [newCircleColor, setNewCircleColor] = useState('#14b8a6');
   const [showCreateCircle, setShowCreateCircle] = useState(false);
   
   // Navigation state
@@ -87,7 +87,8 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     removeFriendFromCircle,
     deleteCircle,
     getFavorites,
-    refreshCircles
+    refreshCircles,
+    invalidateCache
   } = useFriendsList(userPubkey);
 
   const favorites = getFavorites();
@@ -99,7 +100,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
       .sort((a, b) => {
         if (a.status === 'online' && b.status !== 'online') return -1;
         if (a.status !== 'online' && b.status === 'online') return 1;
-        // Both recent, sort by last_seen_at
         return new Date(b.last_seen_at!).getTime() - new Date(a.last_seen_at!).getTime();
       });
   }, [friends]);
@@ -132,11 +132,9 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
     for (const pubkey of memberPubkeys) {
       await addFriendToCircle(pubkey, selectedCircle.id);
-      // Each call of addFriendToCircle handles its own user feedback via toast
     }
 
-    // Refresh circles and update selected circle
-    await refreshCircles();
+    await refreshCircles(true);
     const updatedCircle = circles.find(c => c.id === selectedCircle.id);
     if (updatedCircle) {
       setSelectedCircle(updatedCircle);
@@ -147,8 +145,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     if (!selectedCircle) return;
     await removeFriendFromCircle(memberPubkey, selectedCircle.id);
     
-    // Refresh circles and update selected circle
-    await refreshCircles();
+    await refreshCircles(true);
     const updatedCircle = circles.find(c => c.id === selectedCircle.id);
     if (updatedCircle) {
       setSelectedCircle(updatedCircle);
@@ -158,7 +155,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
   const handleUpdateCircle = async (circleId: string, name: string) => {
     await updateCircle(circleId, name);
     
-    // Update selected circle after refresh
     const updatedCircle = circles.find(c => c.id === circleId);
     if (updatedCircle) {
       setSelectedCircle(updatedCircle);
@@ -172,6 +168,12 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
   const handleBackToCircleDetail = () => {
     setViewState('circle-detail');
+  };
+
+  // Force refresh handler for sync button
+  const handleForceSync = async () => {
+    invalidateCache();
+    await syncFriendsFromNostr();
   };
 
   // Render different views based on state
@@ -297,7 +299,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
   const renderCircles = () => (
     <div className="space-y-6">
-      {/* My Circles Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">My Circles</h3>
@@ -382,7 +383,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
                         <span>{circle.members?.length || 0} members</span>
                       </div>
                       
-                      {/* Enhanced Avatar Stack */}
                       {circle.members && circle.members.length > 0 && (
                         <AvatarStack 
                           members={circle.members} 
@@ -401,7 +401,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
         )}
       </div>
 
-      {/* Circles I'm In Section */}
       {circlesImIn.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Circles I'm In</h3>
@@ -471,7 +470,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
       <div className="px-6 py-6 border-b border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-baseline gap-3">
@@ -481,7 +479,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
             </span>
           </div>
           <Button
-            onClick={syncFriendsFromNostr}
+            onClick={handleForceSync}
             disabled={syncing || operationLoading}
             variant="outline"
             size="sm"
@@ -492,7 +490,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
           </Button>
         </div>
 
-        {/* Add Friend Section */}
         <div className="flex gap-3 mb-6">
           <Input
             placeholder="Add friend by pubkey or npub..."
@@ -511,7 +508,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
           </Button>
         </div>
 
-        {/* Apple-style Segmented Control */}
         <AppleSegmentedControl
           tabs={tabs}
           activeTab={activeTab}
@@ -519,7 +515,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
         />
       </div>
 
-      {/* Tab Content */}
       <div className="px-6 pb-24 overflow-y-auto">
         {loading ? (
           <div className="space-y-4 mt-6">
