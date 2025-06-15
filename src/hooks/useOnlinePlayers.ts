@@ -10,7 +10,6 @@ export interface OnlinePlayer {
   display_name?: string;
   picture?: string;
   last_seen_at: string;
-  is_friend: boolean;
   status: 'online' | 'recent';
 }
 
@@ -22,15 +21,7 @@ export function useOnlinePlayers(userPubkey: string) {
     if (!userPubkey) return;
 
     try {
-      // Get user's friends first
-      const { data: friendsData } = await supabase
-        .from('follow_npub')
-        .select('followed_pubkey')
-        .eq('user_pubkey', userPubkey);
-
-      const friendPubkeys = friendsData?.map(f => f.followed_pubkey) || [];
-
-      // Get all users who were active in the last 24 hours - increased limit for mobile scrolling
+      // Get all users who were active in the last 24 hours
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
       const { data: onlineUsersData } = await supabase
@@ -39,7 +30,7 @@ export function useOnlinePlayers(userPubkey: string) {
         .not('last_seen_at', 'is', null)
         .gte('last_seen_at', twentyFourHoursAgo)
         .order('last_seen_at', { ascending: false })
-        .limit(50); // Increased for better mobile scrolling experience
+        .limit(50);
 
       if (!onlineUsersData) return;
 
@@ -51,7 +42,6 @@ export function useOnlinePlayers(userPubkey: string) {
         .filter(user => user.pubkey !== userPubkey) // Don't include current user
         .map(user => {
           const lastSeenTime = new Date(user.last_seen_at!).getTime();
-          const isFriend = friendPubkeys.includes(user.pubkey);
           
           return {
             id: user.id,
@@ -61,14 +51,11 @@ export function useOnlinePlayers(userPubkey: string) {
             display_name: user.display_name || undefined,
             picture: user.picture || undefined,
             last_seen_at: user.last_seen_at!,
-            is_friend: isFriend,
             status: (lastSeenTime > fifteenMinutesAgo ? 'online' : 'recent') as 'online' | 'recent'
           };
         })
-        // Sort by: friends first, then by recency
+        // Sort by recency
         .sort((a, b) => {
-          if (a.is_friend && !b.is_friend) return -1;
-          if (!a.is_friend && b.is_friend) return 1;
           return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
         });
 

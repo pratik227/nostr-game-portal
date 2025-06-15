@@ -61,13 +61,6 @@ export function PlayerProfileSheet({ player, isOpen, onOpenChange }: PlayerProfi
                 status={player.status} 
                 className="absolute bottom-1 right-1 w-4 h-4 border-2 border-white"
               />
-              
-              {/* Friend indicator */}
-              {player.is_friend && (
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gold rounded-full border-2 border-white flex items-center justify-center">
-                  <Star className="w-3 h-3 text-deep-sea fill-current" />
-                </div>
-              )}
             </div>
 
             <div>
@@ -82,15 +75,13 @@ export function PlayerProfileSheet({ player, isOpen, onOpenChange }: PlayerProfi
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            {!player.is_friend && (
-              <Button 
-                onClick={handleAddFriend}
-                className="w-full bg-deep-sea hover:bg-deep-sea/90 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
-              >
-                <UserPlus className="w-5 h-5" />
-                Add Friend
-              </Button>
-            )}
+            <Button 
+              onClick={handleAddFriend}
+              className="w-full bg-deep-sea hover:bg-deep-sea/90 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+            >
+              <UserPlus className="w-5 h-5" />
+              Add Friend
+            </Button>
             
             <div className="grid grid-cols-2 gap-3">
               <Button
@@ -120,16 +111,6 @@ export function PlayerProfileSheet({ player, isOpen, onOpenChange }: PlayerProfi
                 <span className="text-steel-blue">Status</span>
                 <span className="font-medium text-deep-sea">{getStatusText()}</span>
               </div>
-              
-              {player.is_friend && (
-                <div className="flex justify-between items-center">
-                  <span className="text-steel-blue">Relationship</span>
-                  <span className="font-medium text-gold flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-current" />
-                    Friend
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>

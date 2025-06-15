@@ -5,6 +5,11 @@ import { PlayerAvatar } from './PlayerAvatar';
 import { PlayerProfileSheet } from './PlayerProfileSheet';
 import { RefreshCw, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel";
 
 interface PlayersOnlineSectionProps {
   userPubkey: string;
@@ -46,9 +51,6 @@ export function PlayersOnlineSection({ userPubkey }: PlayersOnlineSectionProps) 
     );
   }
 
-  const displayedPlayers = onlinePlayers.slice(0, 8);
-  const hasMore = onlinePlayers.length > 8;
-
   return (
     <>
       <div className="px-4 mb-6">
@@ -71,42 +73,24 @@ export function PlayersOnlineSection({ userPubkey }: PlayersOnlineSectionProps) 
         </div>
 
         {onlinePlayers.length > 0 ? (
-          <div className="relative">
-            {/* Mobile-optimized horizontal scroll */}
-            <div 
-              className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide scroll-smooth"
-              style={{
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-                WebkitOverflowScrolling: 'touch'
-              }}
-            >
-              {displayedPlayers.map((player) => (
-                <div key={player.id} className="flex-shrink-0">
-                  <PlayerAvatar
-                    player={player}
-                    onClick={() => handlePlayerClick(player)}
-                  />
-                </div>
+          <Carousel
+            opts={{
+              align: "start",
+              dragFree: true,
+            }}
+            className="-ml-4"
+          >
+            <CarouselContent className="pb-3">
+              {onlinePlayers.map((player) => (
+                <CarouselItem key={player.id} className="basis-auto pl-4">
+                    <PlayerAvatar
+                      player={player}
+                      onClick={() => handlePlayerClick(player)}
+                    />
+                </CarouselItem>
               ))}
-              
-              {/* More indicator for mobile */}
-              {hasMore && (
-                <div className="flex-shrink-0 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-steel-blue/50 flex items-center justify-center bg-gray-50">
-                    <span className="text-steel-blue text-xs font-medium">
-                      +{onlinePlayers.length - 8}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Subtle scroll indicator for mobile */}
-            {hasMore && (
-              <div className="absolute right-0 top-0 bottom-3 w-8 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none" />
-            )}
-          </div>
+            </CarouselContent>
+          </Carousel>
         ) : (
           <div className="text-center py-8 text-steel-blue">
             <Users className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -116,7 +100,6 @@ export function PlayersOnlineSection({ userPubkey }: PlayersOnlineSectionProps) 
         )}
       </div>
 
-      {/* Mobile-optimized profile sheet */}
       <PlayerProfileSheet
         player={selectedPlayer}
         isOpen={isProfileSheetOpen}
