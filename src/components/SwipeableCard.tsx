@@ -12,14 +12,14 @@ import {
 } from 'lucide-react';
 import { Profile } from './Profile';
 import { type Friend, type FriendCircle } from '@/hooks/useFriendsList';
-import { toast } from 'sonner';
+import {  toast } from 'sonner';
 
 interface SwipeableCardProps {
   friend: Friend;
   circles: FriendCircle[];
-  onToggleFavorite: (friendId: string) => void;
-  onRemoveFriend: (friendId: string) => void;
-  onAddToCircle: (friendPubkey: string, circleId: string) => void;
+  onToggleFavorite: (friendId: string) => Promise<void>;
+  onRemoveFriend: (friendId: string) => Promise<void>;
+  onAddToCircle: (friendPubkey: string, circleId: string) => Promise<void>;
   showActions?: boolean;
 }
 
@@ -33,6 +33,7 @@ export function SwipeableCard({
 }: SwipeableCardProps) {
   const [showProfile, setShowProfile] = useState(false);
   const [showCircleSelector, setShowCircleSelector] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const copyNpub = (npub: string) => {
     navigator.clipboard.writeText(npub);
@@ -44,10 +45,35 @@ export function SwipeableCard({
     !circle.members?.some(member => member.followed_pubkey === friend.followed_pubkey)
   );
 
-  const handleAddToCircle = (circleId: string) => {
-    onAddToCircle(friend.followed_pubkey, circleId);
-    setShowCircleSelector(false);
-    toast.success('Friend added to circle');
+  const handleToggleFavorite = async () => {
+    setIsLoading(true);
+    try {
+      await onToggleFavorite(friend.id);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    if (window.confirm('Remove this friend?')) {
+      setIsLoading(true);
+      try {
+        await onRemoveFriend(friend.id);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleAddToCircle = async (circleId: string) => {
+    setIsLoading(true);
+    try {
+      await onAddToCircle(friend.followed_pubkey, circleId);
+      setShowCircleSelector(false);
+      toast.success('Friend added to circle');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,6 +83,7 @@ export function SwipeableCard({
         <button
           onClick={() => setShowProfile(true)}
           className="flex items-center gap-3 flex-1 text-left"
+          disabled={isLoading}
         >
           <Avatar className="w-10 h-10 ring-1 ring-gray-200">
             <AvatarImage src={friend.followed_picture || ''} />
@@ -82,6 +109,7 @@ export function SwipeableCard({
               size="sm"
               variant="ghost"
               onClick={() => setShowCircleSelector(true)}
+              disabled={isLoading}
               className="text-teal hover:text-teal hover:bg-teal/10 p-2"
             >
               <Plus className="w-4 h-4" />
@@ -92,7 +120,8 @@ export function SwipeableCard({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onToggleFavorite(friend.id)}
+            onClick={handleToggleFavorite}
+            disabled={isLoading}
             className={friend.is_favorite ? 
               "text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 p-2" : 
               "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 p-2"
@@ -106,6 +135,7 @@ export function SwipeableCard({
             size="sm"
             variant="ghost"
             onClick={() => copyNpub(friend.followed_npub || '')}
+            disabled={isLoading}
             className="text-gray-400 hover:text-gray-600 p-2"
           >
             <Copy className="w-4 h-4" />
@@ -115,11 +145,8 @@ export function SwipeableCard({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => {
-              if (window.confirm('Remove this friend?')) {
-                onRemoveFriend(friend.id);
-              }
-            }}
+            onClick={handleRemoveFriend}
+            disabled={isLoading}
             className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2"
           >
             <Trash2 className="w-4 h-4" />
@@ -165,6 +192,7 @@ export function SwipeableCard({
                       key={circle.id}
                       variant="outline"
                       onClick={() => handleAddToCircle(circle.id)}
+                      disabled={isLoading}
                       className="w-full justify-start h-auto py-3"
                     >
                       <div className="flex items-center gap-3">

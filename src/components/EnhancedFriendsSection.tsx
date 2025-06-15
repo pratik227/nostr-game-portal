@@ -39,16 +39,19 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     circles, 
     circlesImIn, 
     loading, 
-    syncing, 
+    syncing,
+    operationLoading,
     addFriend, 
     removeFriend, 
     syncFriendsFromNostr,
     toggleFavorite,
     createCircle,
+    updateCircle,
     addFriendToCircle,
     removeFriendFromCircle,
     deleteCircle,
-    getFavorites
+    getFavorites,
+    refreshCircles
   } = useFriendsList(userPubkey);
 
   const favorites = getFavorites();
@@ -64,11 +67,6 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     await createCircle(newCircleName.trim());
     setNewCircleName('');
     setShowCreateCircle(false);
-  };
-
-  const handleUpdateCircle = async (circleId: string, name: string) => {
-    // This would need to be implemented in the hook if not already available
-    toast.success('Circle name updated');
   };
 
   const handleCircleClick = (circle: FriendCircle) => {
@@ -87,7 +85,8 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
       await addFriendToCircle(pubkey, selectedCircle.id);
     }
     
-    // Refresh the selected circle data
+    // Refresh circles and update selected circle
+    await refreshCircles();
     const updatedCircle = circles.find(c => c.id === selectedCircle.id);
     if (updatedCircle) {
       setSelectedCircle(updatedCircle);
@@ -98,8 +97,19 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     if (!selectedCircle) return;
     await removeFriendFromCircle(memberPubkey, selectedCircle.id);
     
-    // Refresh the selected circle data
+    // Refresh circles and update selected circle
+    await refreshCircles();
     const updatedCircle = circles.find(c => c.id === selectedCircle.id);
+    if (updatedCircle) {
+      setSelectedCircle(updatedCircle);
+    }
+  };
+
+  const handleUpdateCircle = async (circleId: string, name: string) => {
+    await updateCircle(circleId, name);
+    
+    // Update selected circle after refresh
+    const updatedCircle = circles.find(c => c.id === circleId);
     if (updatedCircle) {
       setSelectedCircle(updatedCircle);
     }
@@ -351,7 +361,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
           </div>
           <Button
             onClick={syncFriendsFromNostr}
-            disabled={syncing}
+            disabled={syncing || operationLoading}
             variant="outline"
             size="sm"
             className="border-gray-200 text-gray-600 hover:text-gray-900"
@@ -368,10 +378,11 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
             value={newFriendInput}
             onChange={(e) => setNewFriendInput(e.target.value)}
             className="flex-1 border-gray-200 focus:border-teal focus:ring-teal/20"
+            disabled={operationLoading}
           />
           <Button 
             onClick={handleAddFriend} 
-            disabled={!newFriendInput.trim()}
+            disabled={!newFriendInput.trim() || operationLoading}
             className="bg-teal hover:bg-teal/90 px-6"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -381,7 +392,26 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
 
         {/* Apple-style Segmented Control */}
         <AppleSegmentedControl
-          tabs={tabs}
+          tabs={[
+            { 
+              id: 'favorites', 
+              label: 'Favorites', 
+              icon: <Star className="w-4 h-4" />, 
+              count: favorites.length 
+            },
+            { 
+              id: 'circles', 
+              label: 'Circles', 
+              icon: <Users className="w-4 h-4" />, 
+              count: circles.length + circlesImIn.length 
+            },
+            { 
+              id: 'all', 
+              label: 'All Friends', 
+              icon: <UserCheck className="w-4 h-4" />, 
+              count: friends.length 
+            }
+          ]}
           activeTab={activeTab}
           onTabChange={(tabId) => setActiveTab(tabId as 'favorites' | 'circles' | 'all')}
         />
@@ -403,7 +433,175 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
           </div>
         ) : (
           <div className="mt-6">
-            {renderTabContent()}
+            {activeTab === 'favorites' && (
+              <div className="space-y-4">
+                {favorites.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Star className="w-12 h-12 text-gray-300 mb-3" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No favorites yet</h3>
+                    <p className="text-gray-500 text-center max-w-sm">
+                      Star your closest friends to keep them easily accessible.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {favorites.map((friend, index) => (
+                      <div key={friend.id}>
+                        <SwipeableCard
+                          friend={friend}
+                          circles={circles}
+                          onToggleFavorite={toggleFavorite}
+                          onRemoveFriend={removeFriend}
+                          onAddToCircle={addFriendToCircle}
+                        />
+                        {index < favorites.length - 1 && <Separator />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'circles' && (
+              <div className="space-y-6">
+                {/* My Circles Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">My Circles</h3>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowCreateCircle(true)}
+                      disabled={operationLoading}
+                      className="bg-teal hover:bg-teal/90"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      New Circle
+                    </Button>
+                  </div>
+
+                  {showCreateCircle && (
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Circle name (e.g., Gaming Squad)"
+                          value={newCircleName}
+                          onChange={(e) => setNewCircleName(e.target.value)}
+                          className="flex-1"
+                          disabled={operationLoading}
+                        />
+                        <Button 
+                          onClick={handleCreateCircle} 
+                          size="sm"
+                          disabled={operationLoading}
+                        >
+                          Create
+                        </Button>
+                        <Button 
+                          onClick={() => setShowCreateCircle(false)} 
+                          variant="outline" 
+                          size="sm"
+                          disabled={operationLoading}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {circles.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-500">No circles created yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {circles.map((circle) => (
+                        <button
+                          key={circle.id}
+                          onClick={() => handleCircleClick(circle)}
+                          disabled={operationLoading}
+                          className="w-full bg-white border rounded-lg p-4 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-gray-900 mb-1">{circle.name}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <Users className="w-4 h-4" />
+                                <span>{circle.members?.length || 0} members</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {circle.members && circle.members.length > 0 && (
+                                <div className="flex -space-x-2">
+                                  {circle.members.slice(0, 3).map((member) => (
+                                    <div key={member.id} className="w-6 h-6 bg-gray-200 rounded-full ring-2 ring-white flex items-center justify-center text-xs text-gray-600">
+                                      {member.followed_display_name?.[0] || member.followed_name?.[0] || 'A'}
+                                    </div>
+                                  ))}
+                                  {circle.members.length > 3 && (
+                                    <div className="w-6 h-6 bg-gray-100 ring-2 ring-white rounded-full flex items-center justify-center text-xs text-gray-500">
+                                      +{circle.members.length - 3}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <ArrowRight className="w-4 h-4 text-gray-400" />
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Circles I'm In Section */}
+                {circlesImIn.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Circles I'm In</h3>
+                    <div className="space-y-3">
+                      {circlesImIn.map((circle) => (
+                        <div key={circle.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium text-gray-900">{circle.name}</h4>
+                            <span className="text-sm text-blue-600">Member</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'all' && (
+              <div className="space-y-4">
+                {friends.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <UserCheck className="w-12 h-12 text-gray-300 mb-3" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No friends yet</h3>
+                    <p className="text-gray-500 text-center max-w-sm">
+                      Add friends manually or sync from your Nostr follows.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {friends.map((friend, index) => (
+                      <div key={friend.id}>
+                        <SwipeableCard
+                          friend={friend}
+                          circles={circles}
+                          onToggleFavorite={toggleFavorite}
+                          onRemoveFriend={removeFriend}
+                          onAddToCircle={addFriendToCircle}
+                        />
+                        {index < friends.length - 1 && <Separator />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
