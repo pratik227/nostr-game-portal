@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AvatarStack } from './AvatarStack';
 import { 
   ArrowLeft, 
   Plus, 
@@ -117,9 +118,21 @@ export function CircleDetailView({
           )}
         </div>
         
-        <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-          <Users className="w-4 h-4" />
-          <span>{circle.members?.length || 0} members</span>
+        <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Users className="w-4 h-4" />
+            <span>{circle.members?.length || 0} members</span>
+          </div>
+          
+          {/* Avatar Stack Preview */}
+          {circle.members && circle.members.length > 0 && (
+            <AvatarStack 
+              members={circle.members} 
+              size="md" 
+              maxDisplay={5}
+              className="ml-auto"
+            />
+          )}
         </div>
       </div>
 
@@ -147,14 +160,14 @@ export function CircleDetailView({
         ) : (
           <div className="space-y-3">
             {circle.members.map((member) => (
-              <div key={member.id} className="flex items-center gap-3 py-2">
+              <div key={member.id} className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-gray-50 transition-colors">
                 <button
                   onClick={() => setSelectedProfile(member.followed_pubkey)}
                   className="flex items-center gap-3 flex-1 text-left"
                 >
-                  <Avatar className="w-12 h-12 ring-1 ring-gray-200">
+                  <Avatar className="w-12 h-12 ring-2 ring-gray-100 shadow-sm hover:ring-teal/20 hover:shadow-md transition-all duration-200">
                     <AvatarImage src={member.followed_picture || ''} />
-                    <AvatarFallback className="bg-gray-50 text-gray-600">
+                    <AvatarFallback className="bg-gradient-to-br from-teal-50 to-blue-50 text-teal-700 font-medium">
                       {member.followed_display_name?.[0] || member.followed_name?.[0] || 'A'}
                     </AvatarFallback>
                   </Avatar>
@@ -176,7 +189,7 @@ export function CircleDetailView({
                       onRemoveMember(member.followed_pubkey);
                     }
                   }}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 p-2"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 p-2 rounded-full"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

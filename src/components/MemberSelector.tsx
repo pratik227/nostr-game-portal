@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AvatarStack } from './AvatarStack';
 import { 
   ArrowLeft, 
   Search, 
   UserPlus,
-  Check
+  Check,
+  Eye
 } from 'lucide-react';
 import { type Friend, type FriendCircle } from '@/hooks/useFriendsList';
 
@@ -43,7 +45,7 @@ export function MemberSelector({
 
   // Filter friends based on search
   const filteredFriends = useMemo(() => {
-    if (!searchQuery) return availableFriends;
+    if (!searchQuery) return availabl eFriends;
     
     const query = searchQuery.toLowerCase();
     return availableFriends.filter(friend => 
@@ -53,6 +55,17 @@ export function MemberSelector({
       friend.followed_npub?.toLowerCase().includes(query)
     );
   }, [availableFriends, searchQuery]);
+
+  // Get selected friends for preview
+  const selectedFriends = friends.filter(friend => 
+    selectedMembers.has(friend.followed_pubkey)
+  );
+
+  // Preview members (existing + selected)
+  const previewMembers = [
+    ...(circle.members || []),
+    ...selectedFriends
+  ];
 
   const handleToggleMember = (pubkey: string) => {
     const newSelected = new Set(selectedMembers);
@@ -102,6 +115,26 @@ export function MemberSelector({
           </div>
         </div>
 
+        {/* Preview Section */}
+        {selectedMembers.size > 0 && (
+          <div className="bg-teal/5 border border-teal/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <Eye className="w-4 h-4 text-teal-600" />
+              <span className="text-sm font-medium text-teal-800">Preview with {selectedMembers.size} new members</span>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <AvatarStack 
+                members={previewMembers} 
+                size="md" 
+                maxDisplay={8}
+              />
+              <span className="text-sm text-gray-600">
+                {previewMembers.length} total members
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -109,7 +142,7 @@ export function MemberSelector({
             placeholder="Search friends..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 border-gray-200 focus:border-teal focus:ring-teal/20"
           />
         </div>
       </div>
@@ -120,7 +153,7 @@ export function MemberSelector({
           <Button
             variant="outline"
             onClick={() => setShowAddNew(true)}
-            className="w-full h-12 border-dashed"
+            className="w-full h-12 border-2 border-dashed border-gray-300 hover:border-teal hover:bg-teal/5"
           >
             <UserPlus className="w-5 h-5 mr-2" />
             Add New Friend
@@ -131,13 +164,13 @@ export function MemberSelector({
               placeholder="Enter pubkey or npub..."
               value={newFriendInput}
               onChange={(e) => setNewFriendInput(e.target.value)}
-              className="flex-1"
+              className="flex-1 border-gray-200 focus:border-teal focus:ring-teal/20"
             />
             <div className="flex gap-2">
               <Button 
                 onClick={handleAddNewFriend}
                 disabled={!newFriendInput.trim()}
-                className="flex-1"
+                className="flex-1 bg-teal hover:bg-teal/90"
               >
                 Follow & Add
               </Button>
@@ -175,7 +208,11 @@ export function MemberSelector({
             {filteredFriends.map((friend) => (
               <div 
                 key={friend.id}
-                className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-b-0"
+                className={`flex items-center gap-3 py-3 px-3 rounded-xl border-2 transition-all duration-200 ${
+                  selectedMembers.has(friend.followed_pubkey)
+                    ? 'border-teal bg-teal/5'
+                    : 'border-transparent hover:bg-gray-50'
+                }`}
               >
                 <Checkbox
                   checked={selectedMembers.has(friend.followed_pubkey)}
@@ -183,9 +220,9 @@ export function MemberSelector({
                   className="data-[state=checked]:bg-teal data-[state=checked]:border-teal"
                 />
                 
-                <Avatar className="w-10 h-10 ring-1 ring-gray-200">
+                <Avatar className="w-10 h-10 ring-2 ring-gray-100 shadow-sm">
                   <AvatarImage src={friend.followed_picture || ''} />
-                  <AvatarFallback className="bg-gray-50 text-gray-600">
+                  <AvatarFallback className="bg-gradient-to-br from-teal-50 to-blue-50 text-teal-700 font-medium">
                     {friend.followed_display_name?.[0] || friend.followed_name?.[0] || 'A'}
                   </AvatarFallback>
                 </Avatar>
@@ -209,7 +246,7 @@ export function MemberSelector({
         <div className="sticky bottom-24 left-0 right-0 p-4 bg-white border-t border-gray-100">
           <Button
             onClick={handleAddSelected}
-            className="w-full bg-teal hover:bg-teal/90 h-12"
+            className="w-full bg-teal hover:bg-teal/90 h-12 shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
             Add {selectedMembers.size} {selectedMembers.size === 1 ? 'Friend' : 'Friends'}
