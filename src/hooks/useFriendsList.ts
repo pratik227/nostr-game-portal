@@ -411,7 +411,7 @@ export function useFriendsList(userPubkey: string) {
   };
 
   // Add friend to circle with controlled refresh and duplicate check
-  const addFriendToCircle = async (friendPubkey: string, circleId: string) => {
+  const addFriendToCircle = async (friendPubkey: string, circleId: string): Promise<void> => {
     if (operationLoading) return;
 
     setOperationLoading(true);
@@ -428,7 +428,7 @@ export function useFriendsList(userPubkey: string) {
       if (existing) {
         // User is already in this circle
         toast.error('User is already a member of this circle');
-        return { status: 'duplicate' };
+        return;
       }
 
       const { error } = await supabase
@@ -443,11 +443,9 @@ export function useFriendsList(userPubkey: string) {
 
       await refreshCircles();
       toast.success('Friend added to circle');
-      return { status: 'added' };
     } catch (error: any) {
       console.error('Error adding friend to circle:', error);
       toast.error(error?.message || 'Failed to add friend to circle');
-      return { status: 'error', error };
     } finally {
       setOperationLoading(false);
     }
