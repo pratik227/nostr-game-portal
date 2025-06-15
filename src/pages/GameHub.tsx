@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play, Plus, RefreshCw, M
 import FloatingActionMenu from '@/components/FloatingActionMenu';
 import { Profile } from '@/components/Profile';
 import { EnhancedFriendsSection } from '@/components/EnhancedFriendsSection';
+import { PlayersOnlineSection } from '@/components/PlayersOnlineSection';
 
 interface GameHubProps {
   onLogout: () => void;
@@ -60,6 +62,10 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const renderGames = () => (
     <div className="p-4 pb-24">
       <h1 className="text-3xl font-bold text-deep-sea mb-6 tracking-tight">Choose Your Game</h1>
+      
+      {/* Online Players Section */}
+      <PlayersOnlineSection userPubkey={userPubkey} />
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {games.map((game) => {
           const CardComponent = game.comingSoon ? 'div' : 'button';
