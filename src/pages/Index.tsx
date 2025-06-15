@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
@@ -6,6 +5,7 @@ import { Profile } from '@/components/Profile'
 import { GameHub } from '@/pages/GameHub'
 import { getProfileFromPubkey } from "@/lib/nostr";
 import { useNostrSupabaseLogin, type SupabaseUser } from "@/hooks/useNostrSupabaseLogin"
+import { updateLastSeenWithProfile, syncUserProfile } from '@/utils/profileSync';
 
 // This declaration is needed to inform TypeScript about the nostr object
 declare global {
@@ -99,9 +99,14 @@ export default function Index() {
     setIsLoggedIn(true);
     setCurrentPage('gamehub'); // Navigate to GameHub after login
     console.log("User logged in with pubkey:", userPubkey);
+    
+    // Get profile data and sync it with database
     const nostrProfile = await getProfileFromPubkey(userPubkey);
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
     setSupabaseUser(user);
+    
+    // Update last seen with profile data
+    await updateLastSeenWithProfile(userPubkey, nostrProfile || {});
   };
 
   const handleSignup = async (userPubkey: string) => {
@@ -111,15 +116,32 @@ export default function Index() {
     setCurrentPage('gamehub'); // Navigate to GameHub after signup
     setProfileReloadKey((prev) => prev + 1);
     console.log("User signed up with pubkey:", userPubkey, "Profile will be reloaded");
+    
+    // Get profile data and sync it with database
     const nostrProfile = await getProfileFromPubkey(userPubkey);
     const user = await loginOrSignup(userPubkey, nostrProfile || {});
     setSupabaseUser(user);
+    
+    // Update last seen with profile data
+    await updateLastSeenWithProfile(userPubkey, nostrProfile || {});
     
     // Show key management interface for new users
     setTimeout(() => {
       showKeyManagement();
     }, 1000); // Small delay to ensure the user is fully set up
   };
+
+  // Add periodic profile sync for current user
+  useEffect(() => {
+    if (isLoggedIn && pubkey) {
+      // Sync profile every 5 minutes
+      const intervalId = setInterval(() => {
+        syncUserProfile(pubkey);
+      }, 5 * 60 * 1000);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [isLoggedIn, pubkey]);
 
   const showKeyManagement = () => {
     // Launch the nostr-login key management interface

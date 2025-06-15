@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useOnlinePlayers, OnlinePlayer } from '@/hooks/useOnlinePlayers';
 import { PlayerAvatar } from './PlayerAvatar';
 import { PlayerProfileSheet } from './PlayerProfileSheet';
@@ -10,6 +9,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
+import { syncUserProfile } from '@/utils/profileSync';
 
 interface PlayersOnlineSectionProps {
   userPubkey: string;
@@ -19,6 +19,36 @@ export function PlayersOnlineSection({ userPubkey }: PlayersOnlineSectionProps) 
   const { onlinePlayers, loading, refreshOnlinePlayers } = useOnlinePlayers(userPubkey);
   const [selectedPlayer, setSelectedPlayer] = useState<OnlinePlayer | null>(null);
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
+
+  // Background sync for players with missing profile data
+  useEffect(() => {
+    if (onlinePlayers.length > 0) {
+      // Find players with minimal profile data
+      const playersNeedingSync = onlinePlayers.filter(player => 
+        !player.name && !player.display_name && !player.picture
+      );
+
+      if (playersNeedingSync.length > 0) {
+        console.log(`Found ${playersNeedingSync.length} players needing profile sync`);
+        
+        // Sync profiles in background (limit to avoid overwhelming)
+        const playersToSync = playersNeedingSync.slice(0, 5); // Only sync first 5 to avoid performance issues
+        
+        playersToSync.forEach(async (player) => {
+          try {
+            await syncUserProfile(player.pubkey);
+          } catch (error) {
+            console.error(`Failed to sync profile for ${player.pubkey}:`, error);
+          }
+        });
+
+        // Refresh the list after a delay to show updated profiles
+        setTimeout(() => {
+          refreshOnlinePlayers();
+        }, 3000);
+      }
+    }
+  }, [onlinePlayers, refreshOnlinePlayers]);
 
   const handlePlayerClick = (player: OnlinePlayer) => {
     console.log('Player clicked:', player);

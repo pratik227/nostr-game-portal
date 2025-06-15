@@ -182,7 +182,20 @@ export type Database = {
     }
     Functions: {
       update_last_seen: {
-        Args: { p_pubkey: string }
+        Args:
+          | { p_pubkey: string }
+          | {
+              p_pubkey: string
+              p_name?: string
+              p_display_name?: string
+              p_picture?: string
+              p_npub?: string
+              p_about?: string
+              p_banner?: string
+              p_nip05?: string
+              p_lud16?: string
+              p_website?: string
+            }
         Returns: undefined
       }
     }
