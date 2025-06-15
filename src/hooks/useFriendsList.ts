@@ -404,6 +404,28 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
+  // Update a circle's name
+  const updateCircle = async (circleId: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_circles')
+        .update({ 
+          name: name.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', circleId)
+        .eq('user_pubkey', userPubkey);
+
+      if (error) throw error;
+
+      await loadCircles();
+      toast.success('Circle updated successfully');
+    } catch (error) {
+      console.error('Error updating circle:', error);
+      toast.error('Failed to update circle');
+    }
+  };
+
   // Get favorites
   const getFavorites = () => {
     return friends.filter(friend => friend.is_favorite);
@@ -468,6 +490,7 @@ export function useFriendsList(userPubkey: string) {
     syncFriendsFromNostr,
     toggleFavorite,
     createCircle,
+    updateCircle,
     addFriendToCircle,
     removeFriendFromCircle,
     deleteCircle,

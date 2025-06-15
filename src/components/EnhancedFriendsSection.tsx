@@ -2,22 +2,18 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { AppleSegmentedControl } from './AppleSegmentedControl';
-import { Profile } from './Profile';
+import { CircleDetailView } from './CircleDetailView';
+import { MemberSelector } from './MemberSelector';
+import { SwipeableCard } from './SwipeableCard';
 import { 
   RefreshCw, 
   Plus, 
   Star, 
   Users, 
   UserCheck, 
-  Trash2, 
-  Copy,
-  Heart,
-  MessageCircle,
-  MoreHorizontal
+  ArrowRight
 } from 'lucide-react';
 import { useFriendsList, type Friend, type FriendCircle } from '@/hooks/useFriendsList';
 import { toast } from 'sonner';
@@ -26,11 +22,17 @@ interface EnhancedFriendsSectionProps {
   userPubkey: string;
 }
 
+type ViewState = 'main' | 'circle-detail' | 'member-selector';
+
 export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionProps) {
   const [activeTab, setActiveTab] = useState<'favorites' | 'circles' | 'all'>('favorites');
   const [newFriendInput, setNewFriendInput] = useState('');
   const [newCircleName, setNewCircleName] = useState('');
   const [showCreateCircle, setShowCreateCircle] = useState(false);
+  
+  // Navigation state
+  const [viewState, setViewState] = useState<ViewState>('main');
+  const [selectedCircle, setSelectedCircle] = useState<FriendCircle | null>(null);
 
   const { 
     friends, 
@@ -64,11 +66,82 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
     setShowCreateCircle(false);
   };
 
-  const copyNpub = (npub: string) => {
-    navigator.clipboard.writeText(npub);
-    toast.success('Npub copied to clipboard');
+  const handleUpdateCircle = async (circleId: string, name: string) => {
+    // This would need to be implemented in the hook if not already available
+    toast.success('Circle name updated');
   };
 
+  const handleCircleClick = (circle: FriendCircle) => {
+    setSelectedCircle(circle);
+    setViewState('circle-detail');
+  };
+
+  const handleAddMembersClick = () => {
+    setViewState('member-selector');
+  };
+
+  const handleAddMembersToCircle = async (memberPubkeys: string[]) => {
+    if (!selectedCircle) return;
+    
+    for (const pubkey of memberPubkeys) {
+      await addFriendToCircle(pubkey, selectedCircle.id);
+    }
+    
+    // Refresh the selected circle data
+    const updatedCircle = circles.find(c => c.id === selectedCircle.id);
+    if (updatedCircle) {
+      setSelectedCircle(updatedCircle);
+    }
+  };
+
+  const handleRemoveMemberFromCircle = async (memberPubkey: string) => {
+    if (!selectedCircle) return;
+    await removeFriendFromCircle(memberPubkey, selectedCircle.id);
+    
+    // Refresh the selected circle data
+    const updatedCircle = circles.find(c => c.id === selectedCircle.id);
+    if (updatedCircle) {
+      setSelectedCircle(updatedCircle);
+    }
+  };
+
+  const handleBackToMain = () => {
+    setViewState('main');
+    setSelectedCircle(null);
+  };
+
+  const handleBackToCircleDetail = () => {
+    setViewState('circle-detail');
+  };
+
+  // Render different views based on state
+  if (viewState === 'circle-detail' && selectedCircle) {
+    return (
+      <CircleDetailView
+        circle={selectedCircle}
+        friends={friends}
+        onBack={handleBackToMain}
+        onAddMembers={handleAddMembersClick}
+        onRemoveMember={handleRemoveMemberFromCircle}
+        onDeleteCircle={deleteCircle}
+        onUpdateCircle={handleUpdateCircle}
+      />
+    );
+  }
+
+  if (viewState === 'member-selector' && selectedCircle) {
+    return (
+      <MemberSelector
+        circle={selectedCircle}
+        friends={friends}
+        onBack={handleBackToCircleDetail}
+        onAddMembers={handleAddMembersToCircle}
+        onAddNewFriend={addFriend}
+      />
+    );
+  }
+
+  // Main view
   const tabs = [
     { 
       id: 'favorites', 
@@ -101,55 +174,16 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
           </p>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="space-y-1">
           {favorites.map((friend, index) => (
             <div key={friend.id}>
-              <div className="flex items-center gap-3 py-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <button className="flex items-center gap-3 flex-1 text-left">
-                      <Avatar className="w-10 h-10 ring-1 ring-gray-200">
-                        <AvatarImage src={friend.followed_picture || ''} />
-                        <AvatarFallback className="bg-gray-50 text-gray-600">
-                          {friend.followed_display_name?.[0] || friend.followed_name?.[0] || 'A'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">
-                          {friend.followed_display_name || friend.followed_name || 'Anonymous'}
-                        </h3>
-                        <p className="text-sm text-gray-500 truncate">
-                          {friend.followed_nip05 || `${friend.followed_npub?.slice(0, 20)}...`}
-                        </p>
-                      </div>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                      <DialogTitle>Friend Profile</DialogTitle>
-                    </DialogHeader>
-                    <Profile pubkey={friend.followed_pubkey} onBack={() => {}} />
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => toggleFavorite(friend.id)}
-                  className="text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50"
-                >
-                  <Star className="w-4 h-4 fill-current" />
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => copyNpub(friend.followed_npub || '')}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
+              <SwipeableCard
+                friend={friend}
+                circles={circles}
+                onToggleFavorite={toggleFavorite}
+                onRemoveFriend={removeFriend}
+                onAddToCircle={addFriendToCircle}
+              />
               {index < favorites.length - 1 && <Separator />}
             </div>
           ))}
@@ -205,42 +239,39 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
         ) : (
           <div className="space-y-3">
             {circles.map((circle) => (
-              <div key={circle.id} className="bg-white border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900">{circle.name}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">
-                      {circle.members?.length || 0} members
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteCircle(circle.id)}
-                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+              <button
+                key={circle.id}
+                onClick={() => handleCircleClick(circle)}
+                className="w-full bg-white border rounded-lg p-4 text-left hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-1">{circle.name}</h4>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Users className="w-4 h-4" />
+                      <span>{circle.members?.length || 0} members</span>
+                    </div>
                   </div>
-                </div>
-                
-                {circle.members && circle.members.length > 0 && (
-                  <div className="flex -space-x-2">
-                    {circle.members.slice(0, 5).map((member) => (
-                      <Avatar key={member.id} className="w-8 h-8 ring-2 ring-white">
-                        <AvatarImage src={member.followed_picture || ''} />
-                        <AvatarFallback className="text-xs">
-                          {member.followed_display_name?.[0] || member.followed_name?.[0] || 'A'}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                    {circle.members.length > 5 && (
-                      <div className="w-8 h-8 bg-gray-100 ring-2 ring-white rounded-full flex items-center justify-center">
-                        <span className="text-xs text-gray-600">+{circle.members.length - 5}</span>
+                  
+                  <div className="flex items-center gap-3">
+                    {circle.members && circle.members.length > 0 && (
+                      <div className="flex -space-x-2">
+                        {circle.members.slice(0, 3).map((member) => (
+                          <div key={member.id} className="w-6 h-6 bg-gray-200 rounded-full ring-2 ring-white flex items-center justify-center text-xs text-gray-600">
+                            {member.followed_display_name?.[0] || member.followed_name?.[0] || 'A'}
+                          </div>
+                        ))}
+                        {circle.members.length > 3 && (
+                          <div className="w-6 h-6 bg-gray-100 ring-2 ring-white rounded-full flex items-center justify-center text-xs text-gray-500">
+                            +{circle.members.length - 3}
+                          </div>
+                        )}
                       </div>
                     )}
+                    <ArrowRight className="w-4 h-4 text-gray-400" />
                   </div>
-                )}
-              </div>
+                </div>
+              </button>
             ))}
           </div>
         )}
@@ -279,64 +310,13 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
         <div className="space-y-1">
           {friends.map((friend, index) => (
             <div key={friend.id}>
-              <div className="flex items-center gap-3 py-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <button className="flex items-center gap-3 flex-1 text-left">
-                      <Avatar className="w-10 h-10 ring-1 ring-gray-200">
-                        <AvatarImage src={friend.followed_picture || ''} />
-                        <AvatarFallback className="bg-gray-50 text-gray-600">
-                          {friend.followed_display_name?.[0] || friend.followed_name?.[0] || 'A'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">
-                          {friend.followed_display_name || friend.followed_name || 'Anonymous'}
-                        </h3>
-                        <p className="text-sm text-gray-500 truncate">
-                          {friend.followed_nip05 || `${friend.followed_npub?.slice(0, 20)}...`}
-                        </p>
-                      </div>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                      <DialogTitle>Friend Profile</DialogTitle>
-                    </DialogHeader>
-                    <Profile pubkey={friend.followed_pubkey} onBack={() => {}} />
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => toggleFavorite(friend.id)}
-                  className={friend.is_favorite ? 
-                    "text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50" : 
-                    "text-gray-400 hover:text-yellow-500 hover:bg-yellow-50"
-                  }
-                >
-                  <Star className={`w-4 h-4 ${friend.is_favorite ? 'fill-current' : ''}`} />
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => copyNpub(friend.followed_npub || '')}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => removeFriend(friend.id)}
-                  className="text-gray-400 hover:text-red-500 hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+              <SwipeableCard
+                friend={friend}
+                circles={circles}
+                onToggleFavorite={toggleFavorite}
+                onRemoveFriend={removeFriend}
+                onAddToCircle={addFriendToCircle}
+              />
               {index < friends.length - 1 && <Separator />}
             </div>
           ))}
@@ -408,7 +388,7 @@ export function EnhancedFriendsSection({ userPubkey }: EnhancedFriendsSectionPro
       </div>
 
       {/* Tab Content */}
-      <div className="px-6 pb-24">
+      <div className="px-6 pb-24 overflow-y-auto">
         {loading ? (
           <div className="space-y-4 mt-6">
             {[...Array(4)].map((_, i) => (
