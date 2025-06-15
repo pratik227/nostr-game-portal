@@ -93,6 +93,7 @@ export default function Index() {
 
   const handleLogin = async (userPubkey: string, closeModal = true) => {
     setPubkey(userPubkey);
+    localStorage.setItem('userPubkey', userPubkey); // Store for friends list
     setIsLoggedIn(true);
     setCurrentPage('gamehub'); // Navigate to GameHub after login
     console.log("User logged in with pubkey:", userPubkey);
@@ -103,6 +104,7 @@ export default function Index() {
 
   const handleSignup = async (userPubkey: string) => {
     setPubkey(userPubkey);
+    localStorage.setItem('userPubkey', userPubkey); // Store for friends list
     setIsLoggedIn(true);
     setCurrentPage('gamehub'); // Navigate to GameHub after signup
     setProfileReloadKey((prev) => prev + 1);
@@ -128,6 +130,7 @@ export default function Index() {
     }
     setIsLoggedIn(false)
     setPubkey('')
+    localStorage.removeItem('userPubkey') // Clear stored pubkey
     setCurrentPage('dashboard')
     setProfileReloadKey(0)
     setWasLoggedInBefore(false)

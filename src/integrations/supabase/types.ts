@@ -9,6 +9,57 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      follow_npub: {
+        Row: {
+          created_at: string
+          followed_about: string | null
+          followed_banner: string | null
+          followed_display_name: string | null
+          followed_lud16: string | null
+          followed_name: string | null
+          followed_nip05: string | null
+          followed_npub: string | null
+          followed_picture: string | null
+          followed_pubkey: string
+          followed_website: string | null
+          id: string
+          updated_at: string
+          user_pubkey: string
+        }
+        Insert: {
+          created_at?: string
+          followed_about?: string | null
+          followed_banner?: string | null
+          followed_display_name?: string | null
+          followed_lud16?: string | null
+          followed_name?: string | null
+          followed_nip05?: string | null
+          followed_npub?: string | null
+          followed_picture?: string | null
+          followed_pubkey: string
+          followed_website?: string | null
+          id?: string
+          updated_at?: string
+          user_pubkey: string
+        }
+        Update: {
+          created_at?: string
+          followed_about?: string | null
+          followed_banner?: string | null
+          followed_display_name?: string | null
+          followed_lud16?: string | null
+          followed_name?: string | null
+          followed_nip05?: string | null
+          followed_npub?: string | null
+          followed_picture?: string | null
+          followed_pubkey?: string
+          followed_website?: string | null
+          id?: string
+          updated_at?: string
+          user_pubkey?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           about: string | null

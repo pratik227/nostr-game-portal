@@ -2,8 +2,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play, Plus, RefreshCw, MessageCircle, Trash2 } from 'lucide-react';
 import FloatingActionMenu from '@/components/FloatingActionMenu';
+import { Profile } from '@/components/Profile';
+import { useFriendsList } from '@/hooks/useFriendsList';
 
 interface GameHubProps {
   onLogout: () => void;
@@ -27,7 +33,7 @@ const games = [
   },
   {
     id: 3,
-    name: "Target Master",
+    name: "Target Master",  
     preview: "https://images.unsplash.com/photo-1485833077593-4278bba3f11f?w=400&h=200&fit=crop",
     maxPlayers: 2,
     comingSoon: true
@@ -43,10 +49,29 @@ const games = [
 
 export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'friends'>('games');
+  const [newFriendInput, setNewFriendInput] = useState('');
+  const [selectedFriend, setSelectedFriend] = useState<string | null>(null);
+  const [challengeMessage, setChallengeMessage] = useState('');
+  
+  // Get user pubkey from localStorage or context
+  const userPubkey = localStorage.getItem('userPubkey') || '';
+  const { friends, loading, syncing, addFriend, removeFriend, syncFriendsFromNostr, sendChallenge } = useFriendsList(userPubkey);
 
   const handlePlayGame = (gameId: number) => {
     console.log(`Playing game ${gameId}`);
     // Game logic will be implemented later
+  };
+
+  const handleAddFriend = async () => {
+    if (!newFriendInput.trim()) return;
+    await addFriend(newFriendInput.trim());
+    setNewFriendInput('');
+  };
+
+  const handleSendChallenge = async (friendPubkey: string) => {
+    const message = challengeMessage.trim() || 'Hey! Want to play a game?';
+    await sendChallenge(friendPubkey, message);
+    setChallengeMessage('');
   };
 
   const renderGames = () => (
@@ -114,12 +139,134 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   );
 
   const renderFriends = () => (
-    <div className="p-4 pb-24 text-center">
-      <div className="mt-20">
-        <Users className="w-16 h-16 text-teal mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-deep-sea mb-2">Friends</h2>
-        <p className="text-steel-blue">Coming soon! Challenge your friends.</p>
+    <div className="p-4 pb-24">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-3xl font-bold text-deep-sea tracking-tight">Friends</h1>
+          <Button
+            onClick={syncFriendsFromNostr}
+            disabled={syncing}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            Sync
+          </Button>
+        </div>
+
+        {/* Add Friend */}
+        <div className="flex gap-2 mb-6">
+          <Input
+            placeholder="Enter pubkey or npub..."
+            value={newFriendInput}
+            onChange={(e) => setNewFriendInput(e.target.value)}
+            className="flex-1"
+          />
+          <Button onClick={handleAddFriend} className="bg-teal hover:bg-teal/90">
+            <Plus className="w-4 h-4 mr-2" />
+            Add
+          </Button>
+        </div>
       </div>
+
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="h-20 bg-gray-200 rounded-xl"></div>
+            </div>
+          ))}
+        </div>
+      ) : friends.length === 0 ? (
+        <div className="text-center py-12">
+          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-deep-sea mb-2">No Friends Yet</h2>
+          <p className="text-steel-blue mb-4">Add friends by their pubkey or npub to start challenging them!</p>
+          <Button onClick={syncFriendsFromNostr} className="bg-teal hover:bg-teal/90">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Sync from Nostr
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {friends.map((friend) => (
+            <Card key={friend.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button className="flex items-center gap-4 flex-1 text-left">
+                        <Avatar className="w-12 h-12">
+                          <AvatarImage src={friend.followed_picture || ''} />
+                          <AvatarFallback className="bg-steel-blue text-white">
+                            <User className="w-6 h-6" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-deep-sea">
+                            {friend.followed_display_name || friend.followed_name || 'Anonymous'}
+                          </h3>
+                          <p className="text-sm text-steel-blue">
+                            {friend.followed_nip05 || `${friend.followed_npub.slice(0, 16)}...`}
+                          </p>
+                        </div>
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl">
+                      <DialogHeader>
+                        <DialogTitle>Friend Profile</DialogTitle>
+                      </DialogHeader>
+                      <Profile 
+                        pubkey={friend.followed_pubkey} 
+                        onBack={() => {}} 
+                      />
+                    </DialogContent>
+                  </Dialog>
+
+                  <div className="flex gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="bg-gold hover:bg-gold/90 text-deep-sea">
+                          <MessageCircle className="w-4 h-4 mr-1" />
+                          Challenge
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Challenge Friend</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Input
+                            placeholder="Enter challenge message (optional)"
+                            value={challengeMessage}
+                            onChange={(e) => setChallengeMessage(e.target.value)}
+                          />
+                          <Button 
+                            onClick={() => handleSendChallenge(friend.followed_pubkey)}
+                            className="w-full bg-gold hover:bg-gold/90 text-deep-sea"
+                          >
+                            Send Challenge
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removeFriend(friend.id)}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -206,7 +353,6 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
       </div>
 
       <FloatingActionMenu options={menuOptions} className="bottom-20" />
-
     </div>
   );
 }
