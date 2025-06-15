@@ -10,7 +10,7 @@ import {
   Users,
   Plus
 } from 'lucide-react';
-import { Profile } from './Profile';
+import { FriendProfileModal } from './FriendProfileModal';
 import { type Friend, type FriendCircle } from '@/hooks/useFriendsList';
 import {  toast } from 'sonner';
 
@@ -154,17 +154,12 @@ export function SwipeableCard({
         </div>
       </div>
 
-      {/* Profile Dialog */}
-      {showProfile && (
-        <Dialog open={showProfile} onOpenChange={setShowProfile}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Friend Profile</DialogTitle>
-            </DialogHeader>
-            <Profile pubkey={friend.followed_pubkey} onBack={() => setShowProfile(false)} />
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Enhanced Friend Profile Modal */}
+      <FriendProfileModal
+        friend={friend}
+        isOpen={showProfile}
+        onOpenChange={setShowProfile}
+      />
 
       {/* Circle Selector Dialog */}
       {showCircleSelector && (
