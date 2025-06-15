@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
@@ -46,7 +47,7 @@ export function useFriendsList(userPubkey: string) {
   const [syncing, setSyncing] = useState(false);
   const [operationLoading, setOperationLoading] = useState(false);
 
-  // Load friends from Supabase cache
+  // Load friends from Supabase cache - stable function
   const loadFriendsFromCache = useCallback(async () => {
     console.log('Loading friends from cache for pubkey:', userPubkey);
     try {
@@ -70,10 +71,8 @@ export function useFriendsList(userPubkey: string) {
     }
   }, [userPubkey]);
 
-  // Load user's circles
-  const loadCircles = useCallback(async (currentFriends?: Friend[]) => {
-    const friendsToUse = currentFriends || friends;
-    
+  // Load user's circles - stable function with friends parameter
+  const loadCircles = useCallback(async (friendsData?: Friend[]) => {
     try {
       const { data: circlesData, error } = await supabase
         .from('friend_circles')
@@ -88,11 +87,14 @@ export function useFriendsList(userPubkey: string) {
 
       if (error) throw error;
 
+      // Use provided friends data or current state
+      const currentFriends = friendsData || friends;
+
       // Process circles with member details
       const circlesWithMembers = await Promise.all(
         (circlesData || []).map(async (circle) => {
           const memberPubkeys = circle.friend_circle_members.map(m => m.member_pubkey);
-          const memberDetails = friendsToUse.filter(friend => 
+          const memberDetails = currentFriends.filter(friend => 
             memberPubkeys.includes(friend.followed_pubkey)
           );
 
@@ -109,9 +111,9 @@ export function useFriendsList(userPubkey: string) {
       console.error('Error loading circles:', error);
       return [];
     }
-  }, [userPubkey, friends]);
+  }, [userPubkey]); // Removed friends dependency
 
-  // Load circles user is a member of
+  // Load circles user is a member of - stable function
   const loadCirclesImIn = useCallback(async () => {
     try {
       const { data: membershipData, error } = await supabase
@@ -143,7 +145,7 @@ export function useFriendsList(userPubkey: string) {
     }
   }, [userPubkey]);
 
-  // Explicit refresh functions
+  // Controlled refresh functions - only call when needed
   const refreshFriends = useCallback(async () => {
     const updatedFriends = await loadFriendsFromCache();
     await loadCircles(updatedFriends);
@@ -225,9 +227,8 @@ export function useFriendsList(userPubkey: string) {
         }
       }
 
-      // Reload from cache
-      await loadFriendsFromCache();
-      await loadCircles();
+      // Explicit refresh only after sync
+      await refreshAll();
       toast.success('Friends list synced from Nostr');
     } catch (error) {
       console.error('Error syncing from Nostr:', error);
@@ -237,9 +238,11 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Add a friend (enhanced with refresh)
+  // Add a friend with controlled refresh
   const addFriend = async (pubkeyOrNpub: string) => {
     console.log('Adding friend:', pubkeyOrNpub);
+    if (operationLoading) return; // Prevent duplicate operations
+    
     setOperationLoading(true);
     try {
       let pubkey = pubkeyOrNpub;
@@ -299,7 +302,7 @@ export function useFriendsList(userPubkey: string) {
         return;
       }
 
-      // Refresh data
+      // Controlled refresh only after successful add
       await refreshFriends();
       toast.success('Friend added successfully');
     } catch (error) {
@@ -310,9 +313,11 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Remove a friend (enhanced with refresh)
+  // Remove a friend with controlled refresh
   const removeFriend = async (friendId: string) => {
     console.log('Removing friend:', friendId);
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -326,7 +331,7 @@ export function useFriendsList(userPubkey: string) {
       // Update Nostr (publish new kind:3 event)
       await publishFollowList();
       
-      // Refresh data
+      // Controlled refresh only after successful removal
       await refreshAll();
       toast.success('Friend removed successfully');
     } catch (error) {
@@ -337,23 +342,41 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Toggle favorite status (enhanced with refresh)
+  // Toggle favorite status with optimistic update
   const toggleFavorite = async (friendId: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
-    try {
-      const friend = friends.find(f => f.id === friendId);
-      if (!friend) return;
+    
+    // Find the friend
+    const friend = friends.find(f => f.id === friendId);
+    if (!friend) {
+      setOperationLoading(false);
+      return;
+    }
 
+    // Optimistic update
+    const newFavoriteStatus = !friend.is_favorite;
+    setFriends(prev => prev.map(f => 
+      f.id === friendId ? { ...f, is_favorite: newFavoriteStatus } : f
+    ));
+
+    try {
       const { error } = await supabase
         .from('follow_npub')
-        .update({ is_favorite: !friend.is_favorite })
+        .update({ is_favorite: newFavoriteStatus })
         .eq('id', friendId)
         .eq('user_pubkey', userPubkey);
 
-      if (error) throw error;
+      if (error) {
+        // Revert optimistic update on error
+        setFriends(prev => prev.map(f => 
+          f.id === friendId ? { ...f, is_favorite: friend.is_favorite } : f
+        ));
+        throw error;
+      }
 
-      await refreshFriends();
-      toast.success(friend.is_favorite ? 'Removed from favorites' : 'Added to favorites');
+      toast.success(newFavoriteStatus ? 'Added to favorites' : 'Removed from favorites');
     } catch (error) {
       console.error('Error toggling favorite:', error);
       toast.error('Failed to update favorite');
@@ -362,8 +385,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Create a new circle (enhanced with refresh)
+  // Create a new circle with controlled refresh
   const createCircle = async (name: string, color?: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -386,8 +411,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Add friend to circle (enhanced with refresh)
+  // Add friend to circle with controlled refresh
   const addFriendToCircle = async (friendPubkey: string, circleId: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -410,8 +437,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Remove friend from circle (enhanced with refresh)
+  // Remove friend from circle with controlled refresh
   const removeFriendFromCircle = async (friendPubkey: string, circleId: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -432,8 +461,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Delete a circle (enhanced with refresh)
+  // Delete a circle with controlled refresh
   const deleteCircle = async (circleId: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -454,8 +485,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Update a circle's name (enhanced with refresh)
+  // Update a circle's name with controlled refresh
   const updateCircle = async (circleId: string, name: string) => {
+    if (operationLoading) return;
+    
     setOperationLoading(true);
     try {
       const { error } = await supabase
@@ -479,10 +512,10 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
-  // Get favorites
-  const getFavorites = () => {
+  // Get favorites - memoized computation
+  const getFavorites = useCallback(() => {
     return friends.filter(friend => friend.is_favorite);
-  };
+  }, [friends]);
 
   // Publish updated follow list to Nostr
   const publishFollowList = async () => {
@@ -518,20 +551,23 @@ export function useFriendsList(userPubkey: string) {
     }
   };
 
+  // Initial load only - no automatic refresh
   useEffect(() => {
     if (userPubkey) {
-      console.log('useEffect triggered with userPubkey:', userPubkey);
+      console.log('Initial load for userPubkey:', userPubkey);
       const initializeData = async () => {
         setLoading(true);
         try {
-          await refreshAll();
+          const friendsData = await loadFriendsFromCache();
+          await loadCircles(friendsData);
+          await loadCirclesImIn();
         } finally {
           setLoading(false);
         }
       };
       initializeData();
     }
-  }, [userPubkey, refreshAll]);
+  }, [userPubkey]); // Only userPubkey dependency - no refresh functions
 
   return {
     friends,
