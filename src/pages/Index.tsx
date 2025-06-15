@@ -47,7 +47,7 @@ export default function Index() {
     if (!document.querySelector('script[src*="nostr-login"]') && !scriptLoaded) {
       const script = document.createElement('script')
       script.src = 'https://www.unpkg.com/nostr-login@latest/dist/unpkg.js'
-      script.setAttribute('data-theme', 'white') // Changed to neutral/white theme
+      script.setAttribute('data-theme', 'ocean') // Updated to ocean theme for cleaner colors
       script.setAttribute('data-perms', 'sign_event:1,sign_event:0')
       script.setAttribute('data-title', 'Nostr Gaming Hub')
       script.setAttribute('data-description', 'Connect your Nostr identity to access minigames')
