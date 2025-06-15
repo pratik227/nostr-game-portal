@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
-import { Event, getEventHash, getSignature, nip04 } from 'nostr-tools';
+import { Event, getEventHash, nip04 } from 'nostr-tools';
 import * as nip19 from 'nostr-tools/nip19';
 import { toast } from 'sonner';
 
@@ -200,7 +200,7 @@ export function useFriendsList(userPubkey: string) {
       if (!currentFriends) return;
 
       // Create kind:3 event
-      const event: Partial<Event> = {
+      const event = {
         kind: 3,
         created_at: Math.floor(Date.now() / 1000),
         tags: currentFriends.map(friend => ['p', friend.followed_pubkey]),
@@ -228,7 +228,7 @@ export function useFriendsList(userPubkey: string) {
       const encryptedMessage = await nip04.encrypt(userPubkey, friendPubkey, message);
 
       // Create kind:4 event (DM)
-      const event: Partial<Event> = {
+      const event = {
         kind: 4,
         created_at: Math.floor(Date.now() / 1000),
         tags: [['p', friendPubkey]],

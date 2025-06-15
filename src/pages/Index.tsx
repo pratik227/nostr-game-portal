@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { Navbar } from '@/components/Navbar'
 import { Dashboard } from '@/components/Dashboard'
@@ -11,6 +12,7 @@ declare global {
   interface Window {
     nostr?: {
       getPublicKey(): Promise<string>
+      signEvent(event: any): Promise<any>
     }
   }
 }
