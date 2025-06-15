@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { pool, DEFAULT_RELAYS, getProfileFromPubkey, formatPubkey, type NostrProfile } from '@/lib/nostr';
-import { Event, getEventHash, nip04 } from 'nostr-tools';
 import * as nip19 from 'nostr-tools/nip19';
 import { toast } from 'sonner';
 
@@ -27,13 +26,19 @@ export function useFriendsList(userPubkey: string) {
 
   // Load friends from Supabase cache
   const loadFriendsFromCache = async () => {
+    console.log('Loading friends from cache for pubkey:', userPubkey);
     try {
       const { data, error } = await supabase
         .from('follow_npub')
         .select('*')
         .eq('user_pubkey', userPubkey);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error loading friends:', error);
+        throw error;
+      }
+      
+      console.log('Loaded friends from cache:', data);
       setFriends(data || []);
     } catch (error) {
       console.error('Error loading friends from cache:', error);
@@ -45,6 +50,7 @@ export function useFriendsList(userPubkey: string) {
 
   // Sync friends from Nostr (kind:3 events)
   const syncFriendsFromNostr = async () => {
+    console.log('Syncing friends from Nostr for pubkey:', userPubkey);
     setSyncing(true);
     try {
       // Fetch the latest kind:3 event from the user
@@ -55,6 +61,7 @@ export function useFriendsList(userPubkey: string) {
       });
 
       if (events.length === 0) {
+        console.log('No kind:3 events found for user');
         setSyncing(false);
         return;
       }
@@ -63,6 +70,8 @@ export function useFriendsList(userPubkey: string) {
       const followedPubkeys = followEvent.tags
         .filter(tag => tag[0] === 'p')
         .map(tag => tag[1]);
+
+      console.log('Found followed pubkeys from Nostr:', followedPubkeys);
 
       // Clear existing follows and add new ones
       await supabase
@@ -73,10 +82,11 @@ export function useFriendsList(userPubkey: string) {
       // Fetch profiles for each followed pubkey and insert to cache
       for (const pubkey of followedPubkeys) {
         try {
+          console.log('Fetching profile for pubkey:', pubkey);
           const profile = await getProfileFromPubkey(pubkey);
           const npub = formatPubkey(pubkey);
 
-          await supabase
+          const { error: insertError } = await supabase
             .from('follow_npub')
             .insert({
               user_pubkey: userPubkey,
@@ -91,6 +101,10 @@ export function useFriendsList(userPubkey: string) {
               followed_lud16: profile?.lud16,
               followed_website: profile?.website
             });
+
+          if (insertError) {
+            console.error('Error inserting friend:', insertError);
+          }
         } catch (error) {
           console.error('Error fetching profile for', pubkey, error);
         }
@@ -109,6 +123,7 @@ export function useFriendsList(userPubkey: string) {
 
   // Add a friend
   const addFriend = async (pubkeyOrNpub: string) => {
+    console.log('Adding friend:', pubkeyOrNpub);
     try {
       let pubkey = pubkeyOrNpub;
       
@@ -118,16 +133,34 @@ export function useFriendsList(userPubkey: string) {
           const decoded = nip19.decode(pubkeyOrNpub);
           if (decoded.type === 'npub') {
             pubkey = decoded.data;
+            console.log('Converted npub to pubkey:', pubkey);
           }
         } catch (error) {
+          console.error('Invalid npub format:', error);
           toast.error('Invalid npub format');
           return;
         }
       }
 
+      // Check if friend already exists
+      const { data: existingFriend } = await supabase
+        .from('follow_npub')
+        .select('id')
+        .eq('user_pubkey', userPubkey)
+        .eq('followed_pubkey', pubkey)
+        .single();
+
+      if (existingFriend) {
+        toast.error('Friend already added');
+        return;
+      }
+
       // Fetch profile
+      console.log('Fetching profile for new friend:', pubkey);
       const profile = await getProfileFromPubkey(pubkey);
       const npub = formatPubkey(pubkey);
+
+      console.log('Fetched profile:', profile);
 
       // Add to cache
       const { error } = await supabase
@@ -146,7 +179,12 @@ export function useFriendsList(userPubkey: string) {
           followed_website: profile?.website
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting friend to database:', error);
+        throw error;
+      }
+
+      console.log('Friend added to database successfully');
 
       // Update Nostr (publish new kind:3 event)
       await publishFollowList();
@@ -162,6 +200,7 @@ export function useFriendsList(userPubkey: string) {
 
   // Remove a friend
   const removeFriend = async (friendId: string) => {
+    console.log('Removing friend:', friendId);
     try {
       const { error } = await supabase
         .from('follow_npub')
@@ -187,7 +226,7 @@ export function useFriendsList(userPubkey: string) {
   const publishFollowList = async () => {
     try {
       if (!window.nostr) {
-        toast.error('Nostr extension not available');
+        console.log('Nostr extension not available, skipping publish');
         return;
       }
 
@@ -211,44 +250,15 @@ export function useFriendsList(userPubkey: string) {
       // Sign and publish
       const signedEvent = await window.nostr.signEvent(event);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
+      console.log('Published follow list to Nostr');
     } catch (error) {
       console.error('Error publishing follow list:', error);
     }
   };
 
-  // Send challenge message (NIP-04 DM)
-  const sendChallenge = async (friendPubkey: string, message: string) => {
-    try {
-      if (!window.nostr) {
-        toast.error('Nostr extension not available');
-        return;
-      }
-
-      // Encrypt message using NIP-04
-      const encryptedMessage = await nip04.encrypt(userPubkey, friendPubkey, message);
-
-      // Create kind:4 event (DM)
-      const event = {
-        kind: 4,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [['p', friendPubkey]],
-        content: encryptedMessage,
-        pubkey: userPubkey
-      };
-
-      // Sign and publish
-      const signedEvent = await window.nostr.signEvent(event);
-      await pool.publish(DEFAULT_RELAYS, signedEvent);
-      
-      toast.success('Challenge sent!');
-    } catch (error) {
-      console.error('Error sending challenge:', error);
-      toast.error('Failed to send challenge');
-    }
-  };
-
   useEffect(() => {
     if (userPubkey) {
+      console.log('useEffect triggered with userPubkey:', userPubkey);
       loadFriendsFromCache();
     }
   }, [userPubkey]);
@@ -259,7 +269,6 @@ export function useFriendsList(userPubkey: string) {
     syncing,
     addFriend,
     removeFriend,
-    syncFriendsFromNostr,
-    sendChallenge
+    syncFriendsFromNostr
   };
 }

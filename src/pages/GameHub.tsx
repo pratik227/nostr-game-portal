@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,12 +49,10 @@ const games = [
 export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'friends'>('games');
   const [newFriendInput, setNewFriendInput] = useState('');
-  const [selectedFriend, setSelectedFriend] = useState<string | null>(null);
-  const [challengeMessage, setChallengeMessage] = useState('');
   
   // Get user pubkey from localStorage or context
   const userPubkey = localStorage.getItem('userPubkey') || '';
-  const { friends, loading, syncing, addFriend, removeFriend, syncFriendsFromNostr, sendChallenge } = useFriendsList(userPubkey);
+  const { friends, loading, syncing, addFriend, removeFriend, syncFriendsFromNostr } = useFriendsList(userPubkey);
 
   const handlePlayGame = (gameId: number) => {
     console.log(`Playing game ${gameId}`);
@@ -66,12 +63,6 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
     if (!newFriendInput.trim()) return;
     await addFriend(newFriendInput.trim());
     setNewFriendInput('');
-  };
-
-  const handleSendChallenge = async (friendPubkey: string) => {
-    const message = challengeMessage.trim() || 'Hey! Want to play a game?';
-    await sendChallenge(friendPubkey, message);
-    setChallengeMessage('');
   };
 
   const renderGames = () => (
@@ -182,7 +173,7 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
         <div className="text-center py-12">
           <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-deep-sea mb-2">No Friends Yet</h2>
-          <p className="text-steel-blue mb-4">Add friends by their pubkey or npub to start challenging them!</p>
+          <p className="text-steel-blue mb-4">Add friends by their pubkey or npub to start connecting with them!</p>
           <Button onClick={syncFriendsFromNostr} className="bg-teal hover:bg-teal/90">
             <RefreshCw className="w-4 h-4 mr-2" />
             Sync from Nostr
@@ -225,33 +216,6 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
                   </Dialog>
 
                   <div className="flex gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button size="sm" className="bg-gold hover:bg-gold/90 text-deep-sea">
-                          <MessageCircle className="w-4 h-4 mr-1" />
-                          Challenge
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Challenge Friend</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <Input
-                            placeholder="Enter challenge message (optional)"
-                            value={challengeMessage}
-                            onChange={(e) => setChallengeMessage(e.target.value)}
-                          />
-                          <Button 
-                            onClick={() => handleSendChallenge(friend.followed_pubkey)}
-                            className="w-full bg-gold hover:bg-gold/90 text-deep-sea"
-                          >
-                            Send Challenge
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-
                     <Button
                       size="sm"
                       variant="outline"
