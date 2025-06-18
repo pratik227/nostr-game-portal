@@ -6,58 +6,84 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { Gamepad2, Trophy, Users, LogOut, User, Wallet, Play, Plus, RefreshCw, MessageCircle, Trash2 } from 'lucide-react';
+import { Gamepad2, Trophy, User, LogOut, User as UserIcon, Wallet, Play, Plus, RefreshCw, MessageCircle, Trash2 } from 'lucide-react';
 import FloatingActionMenu from '@/components/FloatingActionMenu';
 import { Profile } from '@/components/Profile';
 import { EnhancedFriendsSection } from '@/components/EnhancedFriendsSection';
 import { PlayersOnlineSection } from '@/components/PlayersOnlineSection';
+import { TicTacToe } from '@/games/TicTacToe';
 
 interface GameHubProps {
   onLogout: () => void;
   onNavigateToProfile: () => void;
 }
 
-const games = [
-  {
-    id: 1,
-    name: "Lightning Strike",
-    preview: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&h=200&fit=crop",
-    maxPlayers: 4,
-    comingSoon: true
-  },
-  {
-    id: 2,
-    name: "Nostr Puzzle",
-    preview: "https://images.unsplash.com/photo-1535268647677-300dbf3d78d1?w=400&h=200&fit=crop",
-    maxPlayers: 8,
-    comingSoon: true
-  },
-  {
-    id: 3,
-    name: "Target Master",  
-    preview: "https://images.unsplash.com/photo-1485833077593-4278bba3f11f?w=400&h=200&fit=crop",
-    maxPlayers: 2,
-    comingSoon: true
-  },
-  {
-    id: 4,
-    name: "Arcade Classic",
-    preview: "https://images.unsplash.com/photo-1500673922987-e212871fec22?w=400&h=200&fit=crop",
-    maxPlayers: 1,
-    comingSoon: true
-  }
-];
-
 export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'friends'>('games');
+  const [currentGame, setCurrentGame] = useState<string | null>(null);
   
   // Get user pubkey from localStorage or context
   const userPubkey = localStorage.getItem('userPubkey') || '';
 
-  const handlePlayGame = (gameId: number) => {
+  const games = [
+    {
+      id: 'tictactoe',
+      name: "Tic-Tac-Toe",
+      preview: "https://images.unsplash.com/photo-1611996575749-79a3a250f79e?w=400&h=200&fit=crop",
+      maxPlayers: 2,
+      comingSoon: false
+    },
+    {
+      id: 'lightning-strike',
+      name: "Lightning Strike",
+      preview: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&h=200&fit=crop",
+      maxPlayers: 4,
+      comingSoon: true
+    },
+    {
+      id: 'nostr-puzzle',
+      name: "Nostr Puzzle",
+      preview: "https://images.unsplash.com/photo-1535268647677-300dbf3d78d1?w=400&h=200&fit=crop",
+      maxPlayers: 8,
+      comingSoon: true
+    },
+    {
+      id: 'target-master',
+      name: "Target Master",  
+      preview: "https://images.unsplash.com/photo-1485833077593-4278bba3f11f?w=400&h=200&fit=crop",
+      maxPlayers: 2,
+      comingSoon: true
+    }
+  ];
+
+  // Check URL parameters for direct game access
+  useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameParam = urlParams.get('game');
+    if (gameParam === 'tictactoe') {
+      setCurrentGame('tictactoe');
+    }
+  });
+
+  const handlePlayGame = (gameId: string) => {
     console.log(`Playing game ${gameId}`);
-    // Game logic will be implemented later
+    if (gameId === 'tictactoe') {
+      setCurrentGame('tictactoe');
+      // Update URL without page reload
+      window.history.pushState({}, '', `?game=tictactoe`);
+    }
   };
+
+  const handleBackToGames = () => {
+    setCurrentGame(null);
+    // Clear URL parameters
+    window.history.pushState({}, '', window.location.pathname);
+  };
+
+  // If we're in a game, render that game
+  if (currentGame === 'tictactoe') {
+    return <TicTacToe pubkey={userPubkey} onBack={handleBackToGames} />;
+  }
 
   const renderGames = () => (
     <div className="p-4 pb-24">
@@ -99,7 +125,7 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
                 
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center gap-1.5 text-white/90 text-sm bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                    <Users className="w-4 h-4" />
+                    <User className="w-4 h-4" />
                     <span>{game.maxPlayers} Players</span>
                   </div>
                   
@@ -143,7 +169,7 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
   const menuOptions = [
     {
       label: "Profile",
-      Icon: <User className="w-4 h-4" />,
+      Icon: <UserIcon className="w-4 h-4" />,
       onClick: onNavigateToProfile,
     },
     {
@@ -203,7 +229,7 @@ export function GameHub({ onLogout, onNavigateToProfile }: GameHubProps) {
                 : 'text-steel-blue hover:text-deep-sea'
             }`}
           >
-            <Users className="w-5 h-5 mb-1" />
+            <User className="w-5 h-5 mb-1" />
             <span className="text-xs">Friends</span>
           </Button>
         </div>
