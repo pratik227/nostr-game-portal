@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SimplePool } from 'nostr-tools/pool';
 import { finalizeEvent } from 'nostr-tools/pure';
@@ -20,6 +19,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { WaitingRoom } from '@/components/WaitingRoom';
+import { syncUserProfile } from '@/utils/profileSync';
 
 interface GameState {
   board: (string | null)[];
@@ -53,6 +54,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   const sub = useRef<any>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const hasTriedToJoin = useRef(false);
 
   // Game Logic
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
@@ -81,10 +83,6 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   const isRoomCreator = creatorPubkey === pubkey;
   const mySymbol = playerX === pubkey ? 'X' : playerO === pubkey ? 'O' : null;
   const isMyTurn = mySymbol === currentPlayer;
-
-  const getPlayerBySlot = (slot: number) => {
-    return slot === 1 ? playerX : playerO;
-  };
 
   const generateNewGameId = () => {
     setGameId(bytesToHex(generateSecretKey()).slice(0, 8).toUpperCase());
@@ -169,10 +167,12 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   }, [pubkey]);
 
   const handleSubscriptionEnd = useCallback(async () => {
-    console.log('Subscription ended, checking if we can join. Current state:', { playerX, playerO, pubkey, gameStarted });
+    console.log('Subscription ended, checking if we can join. Current state:', { playerX, playerO, pubkey, gameStarted, hasTriedToJoin: hasTriedToJoin.current });
     
-    if (pubkey && gameStarted) {
-      // Wait a bit to ensure we have the latest state
+    if (pubkey && gameStarted && !hasTriedToJoin.current) {
+      hasTriedToJoin.current = true;
+      
+      // Wait a bit to ensure we have the latest state from other players
       setTimeout(async () => {
         console.log('After timeout, current state:', { playerX, playerO, pubkey });
         let shouldJoin = false;
@@ -207,10 +207,13 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
             playerO: newPlayerO,
             creatorPubkey: newCreatorPubkey
           });
+          
+          // Sync user profile to database
+          await syncUserProfile(pubkey);
         } else {
           console.log('Not joining - room might be full or we are already in');
         }
-      }, 500);
+      }, 1000);
     }
   }, [playerX, playerO, pubkey, publishGameState, creatorPubkey, gameStarted]);
 
@@ -251,6 +254,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
 
     try {
       setLoading(true);
+      hasTriedToJoin.current = false; // Reset join attempt flag
       console.log('Starting game with pubkey:', pubkey, 'gameId:', gameId);
       await connectToRelay();
       setGameStarted(true);
@@ -373,6 +377,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
     if (sub.current) sub.current.close();
     setGameStarted(false);
     setIsConnected(false);
+    hasTriedToJoin.current = false;
 
     // Reset game state
     setBoard(Array(9).fill(null));
@@ -501,99 +506,18 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
             </CardContent>
           </Card>
         ) : !gameReady ? (
-        /* Waiting Room */
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-3xl font-bold text-gray-800">🎯 Waiting for Opponent</CardTitle>
-              <div className="flex items-center justify-center space-x-2 mt-3">
-                <span className="text-gray-600">Room:</span>
-                <Badge variant="outline" className="font-mono text-lg px-3 py-1 bg-blue-50 border-blue-200 text-blue-700">
-                  {gameId}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="grid grid-cols-2 gap-6">
-                {[1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className={`p-6 border-3 rounded-2xl text-center transition-all duration-300 ${
-                      getPlayerBySlot(i)
-                        ? 'border-solid border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md'
-                        : 'border-dashed border-gray-300 bg-gray-50'
-                    } ${getPlayerBySlot(i) === pubkey ? '!border-blue-400 !bg-gradient-to-br !from-blue-50 !to-indigo-50 ring-4 ring-blue-100' : ''}`}
-                  >
-                    {getPlayerBySlot(i) ? (
-                      <div className="space-y-3">
-                        <div
-                          className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center text-white font-bold text-2xl shadow-lg ${
-                            i === 1 ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-red-500 to-red-600'
-                          }`}
-                        >
-                          {i === 1 ? 'X' : 'O'}
-                        </div>
-                        <div className="font-semibold text-lg text-gray-800">
-                          {getPlayerBySlot(i) === pubkey ? 'You' : `Player ${i}`}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {i === 1 ? 'Room Creator' : 'Challenger'}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-gray-200 text-gray-400 font-bold text-xl">
-                          ?
-                        </div>
-                        <div className="text-gray-500 font-medium">Waiting...</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="text-center space-y-6">
-                <div className="flex items-center justify-center space-x-3">
-                  <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                  <span className="text-xl font-semibold text-gray-800">{connectedPlayers} / 2 players joined</span>
-                </div>
-
-                {connectedPlayers === 2 ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center space-x-2 text-green-600 font-semibold text-lg">
-                      <CheckCircle className="w-6 h-6" />
-                      <span>Both players connected!</span>
-                    </div>
-                    {isRoomCreator ? (
-                      <Button 
-                        onClick={startGameRound}
-                        size="lg"
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-                      >
-                        🚀 Start Game
-                      </Button>
-                    ) : (
-                      <div className="text-amber-600 font-medium">
-                        Waiting for room creator to start the game...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-amber-600 font-medium text-lg">Need 1 more player to start</div>
-                )}
-              </div>
-
-              <div className="flex justify-center space-x-4">
-                <Button variant="outline" onClick={shareRoom} className="gap-2 shadow-sm hover:shadow-md">
-                  <Share className="w-4 h-4" />
-                  Share Room
-                </Button>
-                <Button variant="outline" onClick={leaveGame} className="gap-2 shadow-sm hover:shadow-md">
-                  <LogOut className="w-4 h-4" />
-                  Leave Room
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        /* Enhanced Waiting Room */
+          <WaitingRoom
+            gameId={gameId}
+            playerX={playerX}
+            playerO={playerO}
+            currentUserPubkey={pubkey}
+            isRoomCreator={isRoomCreator}
+            connectedPlayers={connectedPlayers}
+            onStartGame={startGameRound}
+            onShareRoom={shareRoom}
+            onLeaveRoom={leaveGame}
+          />
         ) : (
         /* Game Board */
           <div className="space-y-6">
