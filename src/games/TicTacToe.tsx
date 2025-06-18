@@ -21,12 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-declare global {
-  interface Window {
-    nostr: any;
-  }
-}
-
 interface GameState {
   board: (string | null)[];
   currentPlayer: string;
@@ -136,6 +130,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
     try {
       const signedEvent = await window.nostr.signEvent(event);
       await Promise.allSettled(pool.current.publish([relayUrl], signedEvent));
+      console.log('Published game state:', currentState);
     } catch (error) {
       console.error('Failed to publish game state:', error);
       showToast('Failed to sync game state', 'error');
@@ -145,8 +140,10 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   const handleGameEvent = useCallback((event: any) => {
     try {
       const incomingState: GameState = JSON.parse(event.content);
+      console.log('Received game event:', incomingState, 'from pubkey:', event.pubkey);
 
       if (incomingState.version > gameStateVersion.current) {
+        console.log('Updating game state from version', gameStateVersion.current, 'to', incomingState.version);
         gameStateVersion.current = incomingState.version;
         setBoard(incomingState.board);
         setCurrentPlayer(incomingState.currentPlayer);
@@ -172,9 +169,12 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   }, [pubkey]);
 
   const handleSubscriptionEnd = useCallback(async () => {
+    console.log('Subscription ended, checking if we can join. Current state:', { playerX, playerO, pubkey, gameStarted });
+    
     if (pubkey && gameStarted) {
-      // Small delay to ensure we have the latest state
+      // Wait a bit to ensure we have the latest state
       setTimeout(async () => {
+        console.log('After timeout, current state:', { playerX, playerO, pubkey });
         let shouldJoin = false;
         let newPlayerX = playerX;
         let newPlayerO = playerO;
@@ -188,6 +188,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
           setCreatorPubkey(pubkey);
           showToast('You joined as Player X (Room Creator)!', 'success');
           shouldJoin = true;
+          console.log('Joining as Player X');
         } 
         // Check if we can join as player O (and we're not already X)
         else if (!newPlayerO && newPlayerX !== pubkey) {
@@ -195,15 +196,19 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
           setPlayerO(pubkey);
           showToast('You joined as Player O!', 'success');
           shouldJoin = true;
+          console.log('Joining as Player O');
         }
 
         // Only publish if we actually joined
         if (shouldJoin) {
+          console.log('Publishing join state:', { playerX: newPlayerX, playerO: newPlayerO, creatorPubkey: newCreatorPubkey });
           await publishGameState({
             playerX: newPlayerX,
             playerO: newPlayerO,
             creatorPubkey: newCreatorPubkey
           });
+        } else {
+          console.log('Not joining - room might be full or we are already in');
         }
       }, 500);
     }
@@ -214,6 +219,8 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
       if (sub.current) sub.current.close();
 
       const filters = [{ kinds: [31337], '#d': [gameId] }];
+      console.log('Connecting to relay with filters:', filters);
+      
       sub.current = pool.current.subscribeMany([relayUrl], filters, {
         onevent: handleGameEvent,
         oneose: handleSubscriptionEnd,
@@ -222,6 +229,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
 
       setIsConnected(true);
       reconnectAttempts.current = 0;
+      console.log('Connected to relay successfully');
 
     } catch (error) {
       console.error('Failed to connect to relay:', error);
@@ -243,6 +251,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
 
     try {
       setLoading(true);
+      console.log('Starting game with pubkey:', pubkey, 'gameId:', gameId);
       await connectToRelay();
       setGameStarted(true);
       showToast('Connected to game room!', 'success');
@@ -426,14 +435,14 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   }, [isConnected, gameStarted]);
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-2xl mx-auto">
         {/* Back Button */}
         <div className="mb-6">
           <Button 
             variant="outline" 
             onClick={onBack}
-            className="gap-2"
+            className="gap-2 bg-white shadow-sm hover:shadow-md transition-shadow"
           >
             ← Back to Games
           </Button>
@@ -441,45 +450,48 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
 
         {/* Game Setup Panel */}
         {!gameStarted ? (
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl">🎯 Tic-Tac-Toe</CardTitle>
-              <p className="text-muted-foreground">Challenge friends in real-time multiplayer</p>
+          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                🎯 Tic-Tac-Toe
+              </CardTitle>
+              <p className="text-lg text-gray-600 mt-2">Challenge friends in real-time multiplayer</p>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Game Room ID</label>
-                <div className="flex space-x-2">
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">Game Room ID</label>
+                <div className="flex space-x-3">
                   <input
                     value={gameId}
                     onChange={(e) => setGameId(e.target.value)}
                     type="text"
-                    className="flex-1 p-2 border border-input rounded-lg bg-background"
+                    className="flex-1 p-3 border-2 border-gray-200 rounded-xl bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
                     placeholder="Enter or generate room ID"
                   />
                   <Button
                     variant="outline"
                     onClick={generateNewGameId}
                     size="icon"
+                    className="p-3 h-12 w-12 border-2 hover:border-blue-500 hover:bg-blue-50"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                <span>Using your connected Nostr identity</span>
+              <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-green-800 font-medium">Using your connected Nostr identity</span>
               </div>
 
               <Button
                 onClick={startGame}
                 disabled={loading}
-                className="w-full"
+                className="w-full py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
               >
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
                     Connecting...
                   </>
                 ) : (
@@ -490,77 +502,93 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
           </Card>
         ) : !gameReady ? (
         /* Waiting Room */
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl">🎯 Waiting for Opponent</CardTitle>
-              <p className="text-muted-foreground">Room: {gameId}</p>
+          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-3xl font-bold text-gray-800">🎯 Waiting for Opponent</CardTitle>
+              <div className="flex items-center justify-center space-x-2 mt-3">
+                <span className="text-gray-600">Room:</span>
+                <Badge variant="outline" className="font-mono text-lg px-3 py-1 bg-blue-50 border-blue-200 text-blue-700">
+                  {gameId}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="space-y-8">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 {[1, 2].map((i) => (
                   <div
                     key={i}
-                    className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    className={`p-6 border-3 rounded-2xl text-center transition-all duration-300 ${
                       getPlayerBySlot(i)
-                        ? 'border-solid border-green-300 bg-green-50'
-                        : 'border-dashed border-muted-foreground/20'
-                    } ${getPlayerBySlot(i) === pubkey ? '!border-primary !bg-primary/10' : ''}`}
+                        ? 'border-solid border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 shadow-md'
+                        : 'border-dashed border-gray-300 bg-gray-50'
+                    } ${getPlayerBySlot(i) === pubkey ? '!border-blue-400 !bg-gradient-to-br !from-blue-50 !to-indigo-50 ring-4 ring-blue-100' : ''}`}
                   >
                     {getPlayerBySlot(i) ? (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div
-                          className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center text-white font-bold text-xl ${
-                            i === 1 ? 'bg-blue-600' : 'bg-red-600'
+                          className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center text-white font-bold text-2xl shadow-lg ${
+                            i === 1 ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-red-500 to-red-600'
                           }`}
                         >
                           {i === 1 ? 'X' : 'O'}
                         </div>
-                        <div className="font-medium">
+                        <div className="font-semibold text-lg text-gray-800">
                           {getPlayerBySlot(i) === pubkey ? 'You' : `Player ${i}`}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {i === 1 ? 'Room Creator' : 'Challenger'}
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-muted text-muted-foreground font-bold">
+                      <div className="space-y-3">
+                        <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-gray-200 text-gray-400 font-bold text-xl">
                           ?
                         </div>
-                        <div className="text-muted-foreground">Waiting...</div>
+                        <div className="text-gray-500 font-medium">Waiting...</div>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
 
-              <div className="text-center space-y-4">
-                <Badge variant="outline" className="text-lg px-4 py-2">
-                  {connectedPlayers} / 2 players joined
-                </Badge>
+              <div className="text-center space-y-6">
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                  <span className="text-xl font-semibold text-gray-800">{connectedPlayers} / 2 players joined</span>
+                </div>
 
                 {connectedPlayers === 2 ? (
-                  <div className="space-y-3">
-                    <div className="text-green-600 font-medium">Both players connected!</div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center space-x-2 text-green-600 font-semibold text-lg">
+                      <CheckCircle className="w-6 h-6" />
+                      <span>Both players connected!</span>
+                    </div>
                     {isRoomCreator ? (
-                      <Button onClick={startGameRound}>
-                        Start Game
+                      <Button 
+                        onClick={startGameRound}
+                        size="lg"
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+                      >
+                        🚀 Start Game
                       </Button>
                     ) : (
-                      <div className="text-muted-foreground">
+                      <div className="text-amber-600 font-medium">
                         Waiting for room creator to start the game...
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-amber-600">Need 1 more player to start</div>
+                  <div className="text-amber-600 font-medium text-lg">Need 1 more player to start</div>
                 )}
               </div>
 
-              <div className="flex justify-center space-x-3">
-                <Button variant="outline" onClick={shareRoom}>
-                  <Share className="w-4 h-4 mr-2" />
+              <div className="flex justify-center space-x-4">
+                <Button variant="outline" onClick={shareRoom} className="gap-2 shadow-sm hover:shadow-md">
+                  <Share className="w-4 h-4" />
                   Share Room
                 </Button>
-                <Button variant="outline" onClick={leaveGame}>
-                  <LogOut className="w-4 h-4 mr-2" />
+                <Button variant="outline" onClick={leaveGame} className="gap-2 shadow-sm hover:shadow-md">
+                  <LogOut className="w-4 h-4" />
                   Leave Room
                 </Button>
               </div>
@@ -570,27 +598,27 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
         /* Game Board */
           <div className="space-y-6">
             {/* Game Header */}
-            <Card>
+            <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
-                  <div className='flex items-center gap-4'>
+                  <div className='flex items-center gap-6'>
                       <div className="flex items-center space-x-2">
-                        <span className="text-muted-foreground text-sm">Room:</span>
-                        <Badge variant="outline" className="font-mono">{gameId}</Badge>
+                        <span className="text-gray-600 text-sm font-medium">Room:</span>
+                        <Badge variant="outline" className="font-mono bg-blue-50 border-blue-200 text-blue-700">{gameId}</Badge>
                       </div>
-                       <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-1">
-                              <span className="font-bold text-lg text-blue-600">X</span>
-                              <span className="font-bold">{xWins}</span>
+                       <div className="flex items-center space-x-4 bg-gray-50 px-4 py-2 rounded-xl">
+                          <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">X</div>
+                              <span className="font-bold text-lg">{xWins}</span>
                           </div>
-                          <div className="text-muted-foreground">-</div>
-                          <div className="flex items-center space-x-1">
-                              <span className="font-bold text-lg text-red-600">O</span>
-                              <span className="font-bold">{oWins}</span>
+                          <div className="text-gray-400 font-bold">-</div>
+                          <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">O</div>
+                              <span className="font-bold text-lg">{oWins}</span>
                           </div>
                       </div>
                   </div>
-                  <div className={`flex items-center space-x-2 text-sm ${isConnected ? 'text-green-600' : 'text-muted-foreground'}`}>
+                  <div className={`flex items-center space-x-2 text-sm px-3 py-1 rounded-full ${isConnected ? 'text-green-600 bg-green-50' : 'text-gray-500 bg-gray-50'}`}>
                     <div className="w-2 h-2 rounded-full bg-current" />
                     <span>{isConnected ? 'Connected' : 'Connecting...'}</span>
                   </div>
@@ -599,29 +627,29 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
             </Card>
 
             {/* Turn Indicator */}
-            <Card>
+            <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
               <CardContent className="pt-6 text-center">
                 {winner ? (
-                  <div className="flex items-center justify-center space-x-2 text-lg font-bold text-green-600">
-                    <Trophy className="w-6 h-6" />
-                    <span>{winner} Wins! 🎉</span>
+                  <div className="flex items-center justify-center space-x-3 text-xl font-bold text-green-600">
+                    <Trophy className="w-8 h-8" />
+                    <span className="text-2xl">{winner} Wins! 🎉</span>
                   </div>
                 ) : isDraw ? (
-                  <div className="flex items-center justify-center space-x-2 text-lg font-bold text-amber-600">
-                    <Equal className="w-6 h-6" />
-                    <span>It's a Draw!</span>
+                  <div className="flex items-center justify-center space-x-3 text-xl font-bold text-amber-600">
+                    <Equal className="w-8 h-8" />
+                    <span className="text-2xl">It's a Draw! 🤝</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center space-x-3">
+                  <div className="flex items-center justify-center space-x-4">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-lg ${
-                        currentPlayer === 'X' ? 'bg-blue-600' : 'bg-red-600'
+                      className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-xl shadow-lg ${
+                        currentPlayer === 'X' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-red-500 to-red-600'
                       }`}
                     >
                       {currentPlayer}
                     </div>
-                    <span>
-                      {isMyTurn ? "Your turn" : "Opponent's turn"}
+                    <span className="text-xl font-semibold text-gray-800">
+                      {isMyTurn ? "🎯 Your turn!" : "⏳ Opponent's turn"}
                     </span>
                   </div>
                 )}
@@ -629,44 +657,46 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
             </Card>
 
             {/* Tic-Tac-Toe Board */}
-            <div
-              className={`grid grid-cols-3 gap-2 max-w-sm mx-auto ${
-                !isMyTurn || winner || isDraw ? 'opacity-60 pointer-events-none' : ''
-              }`}
-            >
-              {board.map((cell, index) => (
-                <button
-                  key={index}
-                  onClick={() => makeMove(index)}
-                  className={`aspect-square bg-background border-2 rounded-lg flex items-center justify-center text-4xl font-bold cursor-pointer transition-all hover:border-primary hover:shadow-md ${
-                    cell === 'X'
-                      ? 'text-blue-600 border-blue-300 bg-blue-50'
-                      : cell === 'O'
-                      ? 'text-red-600 border-red-300 bg-red-50'
-                      : 'border-border'
-                  } ${winningCells.includes(index) ? '!bg-green-100 !border-green-400' : ''}`}
-                >
-                  {cell && (
-                    <span className="block">
-                      {cell}
-                    </span>
-                  )}
-                </button>
-              ))}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
+              <div
+                className={`grid grid-cols-3 gap-3 max-w-md mx-auto ${
+                  !isMyTurn || winner || isDraw ? 'opacity-60 pointer-events-none' : ''
+                }`}
+              >
+                {board.map((cell, index) => (
+                  <button
+                    key={index}
+                    onClick={() => makeMove(index)}
+                    className={`aspect-square bg-white border-3 rounded-xl flex items-center justify-center text-4xl font-bold cursor-pointer transition-all hover:border-blue-400 hover:shadow-lg transform hover:-translate-y-1 ${
+                      cell === 'X'
+                        ? 'text-blue-600 border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md'
+                        : cell === 'O'
+                        ? 'text-red-600 border-red-300 bg-gradient-to-br from-red-50 to-red-100 shadow-md'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    } ${winningCells.includes(index) ? '!bg-gradient-to-br !from-green-100 !to-emerald-100 !border-green-400 ring-4 ring-green-200' : ''}`}
+                  >
+                    {cell && (
+                      <span className="block animate-bounce">
+                        {cell}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Game Controls */}
-            <div className="flex justify-center space-x-3">
-              <Button variant="outline" onClick={resetGame}>
-                <RotateCcw className="w-4 h-4 mr-2" />
+            <div className="flex justify-center space-x-4">
+              <Button variant="outline" onClick={resetGame} className="gap-2 shadow-sm hover:shadow-md">
+                <RotateCcw className="w-4 h-4" />
                 New Round
               </Button>
-              <Button variant="outline" onClick={leaveGame}>
-                <LogOut className="w-4 h-4 mr-2" />
+              <Button variant="outline" onClick={leaveGame} className="gap-2 shadow-sm hover:shadow-md">
+                <LogOut className="w-4 h-4" />
                 Leave Room
               </Button>
-              <Button onClick={shareRoom}>
-                <Share className="w-4 h-4 mr-2" />
+              <Button onClick={shareRoom} className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl">
+                <Share className="w-4 h-4" />
                 Share Room
               </Button>
             </div>
@@ -676,14 +706,14 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
         {/* Connection Status Toast */}
         {showConnectionToast && (
           <div
-            className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white transition-transform duration-300 ${
-              connectionToastType === 'info' ? 'bg-blue-500' :
-              connectionToastType === 'success' ? 'bg-green-500' : 'bg-red-500'
+            className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 backdrop-blur-sm ${
+              connectionToastType === 'info' ? 'bg-blue-500/90' :
+              connectionToastType === 'success' ? 'bg-green-500/90' : 'bg-red-500/90'
             }`}
           >
-            <div className="flex items-center space-x-2">
-              <ConnectionToastIcon className="w-5 h-5" />
-              <span>{connectionToastMessage}</span>
+            <div className="flex items-center space-x-3">
+              <ConnectionToastIcon className="w-6 h-6" />
+              <span className="font-medium">{connectionToastMessage}</span>
             </div>
           </div>
         )}
