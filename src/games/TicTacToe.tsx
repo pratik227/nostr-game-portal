@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { RefreshCwIcon, UserIcon as BrowserIcon, KeyIcon, AlertTriangleIcon, TrophyIcon, EqualIcon, RotateCcwIcon, LogOutIcon, ShareIcon, WifiIcon, WifiOffIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react'; // Assuming lucide-react is installed
+import { RefreshCwIcon, UserIcon as BrowserIcon, KeyIcon, AlertTriangleIcon, TrophyIcon, EqualIcon, RotateCcwIcon, LogOutIcon, ShareIcon, WifiIcon, WifiOffIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
 import { bytesToHex } from '@noble/hashes/utils';
 import { generateSecretKey, getPublicKey, finalizeEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
@@ -8,18 +8,18 @@ import { decode } from 'nostr-tools/nip19';
 // Import your CSS file
 import './NostrTicTacToe.css';
 
-const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
+const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
   // Game State (useState equivalents of Vue refs)
-  const [relayUrl, setRelayUrl] = useState('wss://relay.damus.io'); [cite: 32]
-  const [gameId, setGameId] = useState(''); [cite: 32]
-  const [gameStarted, setGameStarted] = useState(false); [cite: 32]
-  const [loginMethod, setLoginMethod] = useState('extension'); [cite: 32]
-  const [nsec, setNsec] = useState(''); [cite: 32]
-  const [loading, setLoading] = useState(false); [cite: 32]
-  const [isConnected, setIsConnected] = useState(false); [cite: 32]
+  const [relayUrl, setRelayUrl] = useState('wss://relay.damus.io');
+  const [gameId, setGameId] = useState('');
+  const [gameStarted, setGameStarted] = useState(false);
+  const [loginMethod, setLoginMethod] = useState('extension');
+  const [nsec, setNsec] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   // Nostr Connection (using useRef for mutable values that don't trigger re-renders, or useState if they do)
-  const pool = useMemo(() => new SimplePool(), []); [cite: 31] // Memoize the pool instance
+  const pool = useMemo(() => new SimplePool(), []); // Memoize the pool instance
   const subRef = useRef(null); // useRef for the subscription object
   const pubkeyRef = useRef(null);
   const secretKeyRef = useRef(null);
@@ -27,24 +27,24 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
   const maxReconnectAttempts = 5;
 
   // Game Logic State
-  const [board, setBoard] = useState(Array(9).fill(null)); [cite: 32]
-  const [currentPlayer, setCurrentPlayer] = useState('X'); [cite: 32]
-  const [winner, setWinner] = useState(null); [cite: 32]
-  const [winningCells, setWinningCells] = useState([]); [cite: 32]
-  const [gameStateVersion, setGameStateVersion] = useState(0); [cite: 32]
-  const [xWins, setXWins] = useState(0); [cite: 32]
-  const [oWins, setOWins] = useState(0); [cite: 32]
-  const [isMyTurn, setIsMyTurn] = useState(true); [cite: 32]
-  const [playerX, setPlayerX] = useState(null); [cite: 32]
-  const [playerO, setPlayerO] = useState(null); [cite: 32]
-  const [gameReady, setGameReady] = useState(false); [cite: 32]
-  const [creatorPubkey, setCreatorPubkey] = useState(null); [cite: 32]
+  const [board, setBoard] = useState(Array(9).fill(null));
+  const [currentPlayer, setCurrentPlayer] = useState('X');
+  const [winner, setWinner] = useState(null);
+  const [winningCells, setWinningCells] = useState([]);
+  const [gameStateVersion, setGameStateVersion] = useState(0);
+  const [xWins, setXWins] = useState(0);
+  const [oWins, setOWins] = useState(0);
+  const [isMyTurn, setIsMyTurn] = useState(true);
+  const [playerX, setPlayerX] = useState(null);
+  const [playerO, setPlayerO] = useState(null);
+  const [gameReady, setGameReady] = useState(false);
+  const [creatorPubkey, setCreatorPubkey] = useState(null);
 
   // UI State for Toast
-  const [showConnectionToast, setShowConnectionToast] = useState(false); [cite: 32]
-  const [connectionToastMessage, setConnectionToastMessage] = useState(''); [cite: 32]
-  const [connectionToastType, setConnectionToastType] = useState('info'); [cite: 32]
-  const [connectionToastIcon, setConnectionToastIcon] = useState(() => WifiIcon); [cite: 32] // Use a function to set initial state
+  const [showConnectionToast, setShowConnectionToast] = useState(false);
+  const [connectionToastMessage, setConnectionToastMessage] = useState('');
+  const [connectionToastType, setConnectionToastType] = useState('info');
+  const [connectionToastIcon, setConnectionToastIcon] = useState(() => WifiIcon); // Use a function to set initial state
 
   // Computed Properties (useMemo equivalents)
   const isDraw = useMemo(() =>
@@ -62,7 +62,7 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
   const isRoomCreator = useMemo(() => creatorPubkey === pubkeyRef.current, [creatorPubkey]);
 
   const getPlayerBySlot = useCallback((slot) => {
-    return slot === 1 ? playerX : playerO; [cite: 33]
+    return slot === 1 ? playerX : playerO;
   }, [playerX, playerO]);
 
   const mySymbol = useMemo(() => {
@@ -77,192 +77,263 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
   }, []);
 
   const showToast = useCallback((message, type = 'info', duration = 3000) => {
-    setConnectionToastMessage(message); [cite: 34]
-    setConnectionToastType(type); [cite: 34]
+    setConnectionToastMessage(message);
+    setConnectionToastType(type);
     if (type === 'success') {
-      setConnectionToastIcon(() => CheckCircleIcon); [cite: 34]
+      setConnectionToastIcon(() => CheckCircleIcon);
     } else if (type === 'error') {
-      setConnectionToastIcon(() => XCircleIcon); [cite: 35]
+      setConnectionToastIcon(() => XCircleIcon);
     } else {
-      setConnectionToastIcon(() => WifiIcon); [cite: 34]
+      setConnectionToastIcon(() => WifiIcon);
     }
-    setShowConnectionToast(true); [cite: 34]
+    setShowConnectionToast(true);
     
     setTimeout(() => {
-      setShowConnectionToast(false); [cite: 34]
+      setShowConnectionToast(false);
     }, duration);
   }, []);
 
   // Forward declaration for mutual recursion (important for connectToRelay and attemptReconnect)
   const connectToRelay = useCallback(async () => {
     try {
-      if (subRef.current) subRef.current.close(); [cite: 38]
+      if (subRef.current) subRef.current.close();
       
-      const filters = [{ kinds: [31337], '#d': [gameId] }]; [cite: 38]
+      const filters = [{ kinds: [31337], '#d': [gameId] }];
       subRef.current = pool.subscribeMany([relayUrl], filters, {
-        onevent: handleGameEvent, [cite: 38]
-        oneose: handleSubscriptionEnd, [cite: 38]
-        onclose: handleConnectionClose [cite: 38]
+        onevent: handleGameEvent,
+        oneose: handleSubscriptionEnd,
+        onclose: handleConnectionClose
       });
       
-      setIsConnected(true); [cite: 38]
-      reconnectAttemptsRef.current = 0; [cite: 38]
+      setIsConnected(true);
+      reconnectAttemptsRef.current = 0;
       
     } catch (error) {
       console.error('Failed to connect to relay:', error);
-      setIsConnected(false); [cite: 38]
-      attemptReconnect(); [cite: 38]
+      setIsConnected(false);
+      attemptReconnect();
     }
   }, [gameId, relayUrl, pool]); // Dependencies for connectToRelay
 
   const attemptReconnect = useCallback(() => {
-    if (reconnectAttemptsRef.current >= maxReconnectAttempts) { [cite: 47]
-      showToast('Failed to reconnect. Please refresh the page.', 'error', 5000); [cite: 47]
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      showToast('Failed to reconnect. Please refresh the page.', 'error', 5000);
       return;
     }
     
-    reconnectAttemptsRef.current++; [cite: 47]
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000); [cite: 47]
+    reconnectAttemptsRef.current++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
     
     setTimeout(() => {
-      if (gameStarted && !isConnected) { [cite: 47]
-        connectToRelay(); [cite: 47]
+      if (gameStarted && !isConnected) {
+        connectToRelay();
       }
     }, delay);
   }, [gameStarted, isConnected, connectToRelay, showToast]);
 
-  const publishGameState = useCallback(async () => {
-    if (!pubkeyRef.current || !isConnected) return; [cite: 51]
-    
+  async function publishGameState() {
+    if (!pubkeyRef.current) {
+      console.warn('publishGameState: pubkeyRef.current missing', pubkeyRef.current);
+      return;
+    }
     const event = {
-      kind: 31337, [cite: 51]
-      created_at: Math.floor(Date.now() / 1000), [cite: 51]
-      tags: [['d', gameId]], [cite: 51]
-      pubkey: pubkeyRef.current, [cite: 51]
+      kind: 31337,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', gameId]],
+      pubkey: pubkeyRef.current,
       content: JSON.stringify({
-        board: board, [cite: 52]
-        currentPlayer: currentPlayer, [cite: 52]
-        winner: winner, [cite: 52]
-        winningCells: winningCells, [cite: 52]
-        version: gameStateVersion, [cite: 52]
-        xWins: xWins, [cite: 52]
-        oWins: oWins, [cite: 52]
-        playerX: playerX, [cite: 52]
-        playerO: playerO, [cite: 52]
-        gameReady: gameReady, [cite: 52]
-        creatorPubkey: creatorPubkey [cite: 52]
+        board: board,
+        currentPlayer: currentPlayer,
+        winner: winner,
+        winningCells: winningCells,
+        version: gameStateVersion,
+        xWins: xWins,
+        oWins: oWins,
+        playerX: playerX,
+        playerO: playerO,
+        gameReady: gameReady,
+        creatorPubkey: creatorPubkey
       })
     };
-    
+    console.log('publishGameState', {
+      pubkey: pubkeyRef.current,
+      secretKey: secretKeyRef.current,
+      relayUrl,
+      event
+    });
     try {
-      const signedEvent = loginMethod === 'key' 
-        ? finalizeEvent(event, secretKeyRef.current) [cite: 53]
-        : await window.nostr.signEvent(event); [cite: 53]
-      
-      await Promise.allSettled(pool.publish([relayUrl], signedEvent)); [cite: 53]
+      const signedEvent = loginMethod === 'key'
+        ? finalizeEvent(event, secretKeyRef.current)
+        : await window.nostr.signEvent(event);
+      await Promise.allSettled(pool.publish([relayUrl], signedEvent));
+      console.log('publishGameState: published', signedEvent);
     } catch (error) {
       console.error('Failed to publish game state:', error);
       showToast('Failed to sync game state', 'error');
     }
-  }, [gameId, isConnected, board, currentPlayer, winner, winningCells, gameStateVersion, xWins, oWins, playerX, playerO, gameReady, creatorPubkey, loginMethod, relayUrl, pool, showToast]);
+  }
+
+  async function publishGameStateWithValues(stateValues) {
+    if (!pubkeyRef.current) {
+      console.warn('publishGameStateWithValues: pubkeyRef.current missing', pubkeyRef.current);
+      return;
+    }
+    const event = {
+      kind: 31337,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', gameId]],
+      pubkey: pubkeyRef.current,
+      content: JSON.stringify(stateValues)
+    };
+    console.log('publishGameStateWithValues', {
+      pubkey: pubkeyRef.current,
+      secretKey: secretKeyRef.current,
+      relayUrl,
+      event
+    });
+    try {
+      const signedEvent = loginMethod === 'key'
+        ? finalizeEvent(event, secretKeyRef.current)
+        : await window.nostr.signEvent(event);
+      await Promise.allSettled(pool.publish([relayUrl], signedEvent));
+      console.log('publishGameStateWithValues: published', signedEvent);
+    } catch (error) {
+      console.error('Failed to publish game state:', error);
+      showToast('Failed to sync game state', 'error');
+    }
+  }
 
   const handleGameEvent = useCallback((event) => {
     try {
-      const incomingState = JSON.parse(event.content); [cite: 39]
+      const incomingState = JSON.parse(event.content);
       
-      if (incomingState.version > gameStateVersion) { [cite: 39]
-        setBoard(incomingState.board); [cite: 39]
-        setCurrentPlayer(incomingState.currentPlayer); [cite: 39]
-        setWinner(incomingState.winner); [cite: 39]
-        setWinningCells(incomingState.winningCells || []); [cite: 39, 40]
-        setGameStateVersion(incomingState.version); [cite: 39]
-        setXWins(incomingState.xWins || 0); [cite: 39, 41]
-        setOWins(incomingState.oWins || 0); [cite: 39, 42]
-        setPlayerX(incomingState.playerX); [cite: 39]
-        setPlayerO(incomingState.playerO); [cite: 39]
-        setGameReady(incomingState.gameReady || false); [cite: 39, 43]
-        setCreatorPubkey(incomingState.creatorPubkey); [cite: 39]
+      if (incomingState.version > gameStateVersion) {
+        setBoard(incomingState.board);
+        setCurrentPlayer(incomingState.currentPlayer);
+        setWinner(incomingState.winner);
+        setWinningCells(incomingState.winningCells || []);
+        setGameStateVersion(incomingState.version);
+        setXWins(incomingState.xWins || 0);
+        setOWins(incomingState.oWins || 0);
+        setPlayerX(incomingState.playerX);
+        setPlayerO(incomingState.playerO);
+        setGameReady(incomingState.gameReady || false);
+        setCreatorPubkey(incomingState.creatorPubkey);
         
-        if (incomingState.gameReady) { [cite: 43]
+        // If we see a game state and we're not a player yet, join as Player O
+        if (incomingState.playerX && !incomingState.playerO && 
+            incomingState.playerX !== pubkeyRef.current && 
+            pubkeyRef.current !== playerX && pubkeyRef.current !== playerO) {
+          setPlayerO(pubkeyRef.current);
+          showToast('You joined as Player O!', 'success');
+          setGameStateVersion(incomingState.version + 1);
+          // Publish immediately with the current state values
+          setTimeout(() => {
+            publishGameStateWithValues({
+              ...incomingState,
+              playerO: pubkeyRef.current,
+              version: incomingState.version + 1
+            });
+          }, 100);
+        }
+        
+        if (incomingState.gameReady) {
           // Note: mySymbol needs to be calculated based on the updated state,
           // or passed as a dependency if using an older version.
           // For simplicity here, assuming mySymbol would react to updated playerX/O.
           const currentMySymbol = (playerX === pubkeyRef.current ? 'X' : (playerO === pubkeyRef.current ? 'O' : null));
-          setIsMyTurn(incomingState.currentPlayer === currentMySymbol); [cite: 43]
-          if (event.pubkey !== pubkeyRef.current && !incomingState.winner && !isDraw) { [cite: 43]
-            showToast("Opponent moved - your turn!", 'info', 2000); [cite: 43]
+          setIsMyTurn(incomingState.currentPlayer === currentMySymbol);
+          if (event.pubkey !== pubkeyRef.current && !incomingState.winner && !isDraw) {
+            showToast("Opponent moved - your turn!", 'info', 2000);
           }
         }
         
-        onScoreUpdate(Math.max(incomingState.xWins, incomingState.oWins) * 100); [cite: 44]
+        onScoreUpdate(Math.max(incomingState.xWins, incomingState.oWins) * 100);
         
-        if (incomingState.winner || isDraw) { [cite: 44]
+        if (incomingState.winner || isDraw) {
           const isWinner = (incomingState.winner === mySymbol); // mySymbol needs to be current state
-          onGameOver({ [cite: 44]
-            score: (isWinner ? 100 : 50), [cite: 45]
-            win: isWinner, [cite: 45]
-            duration: Date.now(), [cite: 45]
-            level: 1 [cite: 45]
+          onGameOver({
+            score: (isWinner ? 100 : 50),
+            win: isWinner,
+            duration: Date.now(),
+            level: 1
           });
         }
       }
     } catch (error) {
       console.error('Failed to parse game event:', error);
     }
-  }, [gameStateVersion, isDraw, mySymbol, onScoreUpdate, onGameOver, showToast, playerX, playerO]); // Add relevant state dependencies
+  }, [gameStateVersion, isDraw, mySymbol, onScoreUpdate, onGameOver, showToast, playerX, playerO, publishGameState]);
 
   const handleSubscriptionEnd = useCallback(() => {
-    // Only set player if slots are truly empty according to the latest state.
-    // This is a subtle race condition in distributed systems; consider a more robust handshake.
-    if (!playerX) { [cite: 45]
-      pubkeyRef.current = pubkeyRef.current || Math.random().toString(36).substring(2, 15); // Fallback if pubkey not set earlier
-      setPlayerX(pubkeyRef.current); [cite: 45]
-      setCreatorPubkey(pubkeyRef.current); [cite: 45]
-      showToast('You joined as Player X!', 'success'); [cite: 45]
-    } else if (!playerO && playerX !== pubkeyRef.current) { [cite: 46]
-      pubkeyRef.current = pubkeyRef.current || Math.random().toString(36).substring(2, 15);
-      setPlayerO(pubkeyRef.current); [cite: 46]
-      showToast('You joined as Player O!', 'success'); [cite: 46]
-    }
-    setGameStateVersion(prev => prev + 1); [cite: 46]
-    publishGameState(); [cite: 46]
+    // Subscription ended - this is just for logging
+    console.log('Subscription ended');
   }, [playerX, playerO, showToast, publishGameState]);
 
   const handleConnectionClose = useCallback(() => {
-    setIsConnected(false); [cite: 47]
-    showToast('Connection lost, attempting to reconnect...', 'error'); [cite: 47]
-    attemptReconnect(); [cite: 47]
+    setIsConnected(false);
+    showToast('Connection lost, attempting to reconnect...', 'error');
+    attemptReconnect();
   }, [showToast, attemptReconnect]);
 
   const startGame = useCallback(async () => {
-    if (!gameId || !relayUrl) { [cite: 36]
-      showToast('Please provide relay URL and game ID', 'error'); [cite: 36]
+    if (!gameId || !relayUrl) {
+      showToast('Please provide relay URL and game ID', 'error');
       return;
     }
 
     try {
-      setLoading(true); [cite: 36]
+      setLoading(true);
       
-      if (loginMethod === 'key') { [cite: 36]
-        if (!nsec) { [cite: 36]
-          throw new Error('Please enter your private key'); [cite: 36]
+      if (loginMethod === 'key') {
+        if (!nsec) {
+          throw new Error('Please enter your private key');
         }
-        const decoded = decode(nsec.trim()); [cite: 36]
-        if (decoded.type !== 'nsec') { [cite: 36]
-          throw new Error('Invalid nsec format'); [cite: 36]
+        const decoded = decode(nsec.trim());
+        if (decoded.type !== 'nsec') {
+          throw new Error('Invalid nsec format');
         }
-        secretKeyRef.current = decoded.data; [cite: 36]
-        pubkeyRef.current = getPublicKey(secretKeyRef.current); [cite: 36]
+        secretKeyRef.current = decoded.data;
+        pubkeyRef.current = getPublicKey(secretKeyRef.current);
       } else {
-        if (!window.nostr) { [cite: 36]
-          throw new Error('Nostr extension not found. Please install a Nostr browser extension.'); [cite: 36]
+        if (!window.nostr) {
+          throw new Error('Nostr extension not found. Please install a Nostr browser extension.');
         }
-        pubkeyRef.current = await window.nostr.getPublicKey(); [cite: 37]
+        pubkeyRef.current = await window.nostr.getPublicKey();
       }
 
-      await connectToRelay(); [cite: 37]
-      setGameStarted(true); [cite: 37]
-      showToast('Connected to game room!', 'success'); [cite: 37]
+      await connectToRelay();
+      setGameStarted(true);
+      showToast('Connected to game room!', 'success');
+      
+      // Wait a bit to see if there's an existing game state
+      // If not, we'll be the room creator and Player X
+      setTimeout(() => {
+        if (!playerX && !playerO) {
+          // No existing players, we're the first/creator
+          setPlayerX(pubkeyRef.current);
+          setCreatorPubkey(pubkeyRef.current);
+          setGameStateVersion(1);
+          showToast('You joined as Player X!', 'success');
+          // Publish with explicit values instead of relying on state
+          setTimeout(() => {
+            publishGameStateWithValues({
+              board: Array(9).fill(null),
+              currentPlayer: 'X',
+              winner: null,
+              winningCells: [],
+              version: 1,
+              xWins: 0,
+              oWins: 0,
+              playerX: pubkeyRef.current,
+              playerO: null,
+              gameReady: false,
+              creatorPubkey: pubkeyRef.current
+            });
+          }, 100);
+        }
+        // If there are existing players, handleGameEvent will handle joining
+      }, 500);
       
     } catch (error) {
       console.error('Failed to start game:', error);
@@ -270,25 +341,141 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
     } finally {
       setLoading(false);
     }
-  }, [gameId, relayUrl, loginMethod, nsec, showToast, connectToRelay]);
+  }, [gameId, relayUrl, loginMethod, nsec, showToast, connectToRelay, publishGameState]);
 
-  // Other game logic functions (makeMove, checkWinner, resetGame, leaveGame, shareRoom)
-  // These will also need to be converted to useCallback functions.
-  // ...
+  // Game Logic Functions
+  const startGameRound = useCallback(() => {
+    if (!isRoomCreator || connectedPlayers < 2) return;
+    
+    setGameReady(true);
+    setBoard(Array(9).fill(null));
+    setCurrentPlayer('X');
+    setWinner(null);
+    setWinningCells([]);
+    setIsMyTurn(mySymbol === 'X');
+    setGameStateVersion(prev => prev + 1);
+    publishGameState();
+    showToast('Game started!', 'success');
+  }, [isRoomCreator, connectedPlayers, mySymbol, publishGameState, showToast]);
+
+  const makeMove = useCallback(async (index) => {
+    if (!isMyTurn || board[index] || winner || isDraw || !gameReady) {
+      return;
+    }
+    
+    // Make move locally
+    const newBoard = [...board];
+    newBoard[index] = currentPlayer;
+    setBoard(newBoard);
+    setIsMyTurn(false);
+    
+    // Check for winner with the new board
+    const winPatterns = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+      [0, 4, 8], [2, 4, 6] // Diagonals
+    ];
+    
+    let hasWinner = false;
+    let winningPattern = [];
+    
+    for (const pattern of winPatterns) {
+      const [a, b, c] = pattern;
+      if (newBoard[a] && 
+          newBoard[a] === newBoard[b] && 
+          newBoard[a] === newBoard[c]) {
+        setWinner(newBoard[a]);
+        setWinningCells(pattern);
+        
+        // Update win count
+        if (newBoard[a] === 'X') {
+          setXWins(prev => prev + 1);
+        } else {
+          setOWins(prev => prev + 1);
+        }
+        
+        hasWinner = true;
+        winningPattern = pattern;
+        break;
+      }
+    }
+    
+    // Switch player if no winner
+    if (!hasWinner) {
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+    }
+    
+    // Update version and publish
+    setGameStateVersion(prev => prev + 1);
+    await publishGameState();
+  }, [isMyTurn, board, winner, isDraw, gameReady, currentPlayer, publishGameState]);
+
+  const resetGame = useCallback(async () => {
+    setBoard(Array(9).fill(null));
+    setCurrentPlayer('X');
+    setWinner(null);
+    setWinningCells([]);
+    setIsMyTurn(mySymbol === 'X');
+    setGameStateVersion(prev => prev + 1);
+    
+    await publishGameState();
+    showToast('New round started!', 'info');
+  }, [mySymbol, publishGameState, showToast]);
+
+  const leaveGame = useCallback(() => {
+    if (subRef.current) subRef.current.close();
+    setGameStarted(false);
+    setIsConnected(false);
+    
+    // Reset game state
+    setBoard(Array(9).fill(null));
+    setCurrentPlayer('X');
+    setWinner(null);
+    setWinningCells([]);
+    setGameStateVersion(0);
+    setXWins(0);
+    setOWins(0);
+    setIsMyTurn(true);
+    setPlayerX(null);
+    setPlayerO(null);
+    setGameReady(false);
+    setCreatorPubkey(null);
+  }, []);
+
+  const shareRoom = useCallback(async () => {
+    const shareUrl = `${window.location.origin}/games/nostr-tictactoe?room=${gameId}&relay=${encodeURIComponent(relayUrl)}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join my Tic-Tac-Toe game!',
+          text: `Play Tic-Tac-Toe with me on Nostr`,
+          url: shareUrl
+        });
+      } catch (error) {
+        // Fallback to clipboard
+        await navigator.clipboard.writeText(shareUrl);
+        showToast('Room link copied to clipboard!', 'success');
+      }
+    } else {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast('Room link copied to clipboard!', 'success');
+    }
+  }, [gameId, relayUrl, showToast]);
 
   // useEffect for onMounted equivalent
   useEffect(() => {
-    generateNewGameId(); [cite: 56]
-    const urlParams = new URLSearchParams(window.location.search); [cite: 56]
-    const roomParam = urlParams.get('room'); [cite: 56]
-    const relayParam = urlParams.get('relay'); [cite: 56]
+    generateNewGameId();
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    const relayParam = urlParams.get('relay');
     
-    if (roomParam) setGameId(roomParam); [cite: 56]
-    if (relayParam) setRelayUrl(decodeURIComponent(relayParam)); [cite: 56]
+    if (roomParam) setGameId(roomParam);
+    if (relayParam) setRelayUrl(decodeURIComponent(relayParam));
 
     // Cleanup function for onBeforeUnmount
     return () => {
-      if (subRef.current) subRef.current.close(); [cite: 54]
+      if (subRef.current) subRef.current.close();
       pool.close([relayUrl]); // Ensure relayUrl is the final state value before unmount
     };
   }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
@@ -300,10 +487,12 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
     }
   }, [isConnected, gameStarted, showToast]);
 
+
+
   return (
     <div className="nostr-game-container">
       {/* Game Setup Panel */}
-      {!gameStarted && ( // v-if="!gameStarted"
+      {!gameStarted && (
         <div className="setup-panel">
           <div className="setup-header">
             <h2 className="game-title">💡 Nostr Tic-Tac-Toe</h2>
@@ -314,8 +503,8 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
             <div className="input-group">
               <label>Nostr Relay URL</label>
               <input 
-                [cite_start]value={relayUrl} // v-model="relayUrl" [cite: 2]
-                onChange={(e) => setRelayUrl(e.target.value)} // v-model="relayUrl"
+                value={relayUrl}
+                onChange={(e) => setRelayUrl(e.target.value)}
                 type="url" 
                 className="input"
                 placeholder="wss://relay.damus.io"
@@ -326,8 +515,8 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
               <label>Game Room ID</label>
               <div className="input-with-button">
                 <input 
-                  [cite_start]value={gameId} // v-model="gameId" [cite: 3]
-                  onChange={(e) => setGameId(e.target.value)} // v-model="gameId"
+                  value={gameId}
+                  onChange={(e) => setGameId(e.target.value)}
                   type="text" 
                   className="input"
                   placeholder="Enter or generate room ID"
@@ -389,7 +578,7 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
       )}
 
       {/* Waiting Room */}
-      {gameStarted && !gameReady && ( // v-else-if="!gameReady"
+      {gameStarted && !gameReady && (
         <div className="waiting-room">
           <div className="waiting-header">
             <h2 className="game-title">💡 Waiting for Opponent</h2>
@@ -398,16 +587,16 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
 
           <div className="players-waiting">
             <div className="player-slots">
-              {[...Array(2)].map((_, i) => ( // v-for="i in 2" 
+              {[...Array(2)].map((_, i) => ( 
                 <div
-                  key={i + 1} // :key="i"
-                  className={`player-slot ${getPlayerBySlot(i + 1) ? 'filled' : ''} ${getPlayerBySlot(i + 1) === pubkeyRef.current ? [cite_start]'is-me' : ''}`} [cite: 11]
+                  key={i + 1}
+                  className={`player-slot ${getPlayerBySlot(i + 1) ? 'filled' : ''} ${getPlayerBySlot(i + 1) === pubkeyRef.current ? 'is-me' : ''}`}
                 >
                   {getPlayerBySlot(i + 1) ? (
                     <div className="player-info">
                       <div 
                         className="player-avatar" 
-                        [cite_start]style={{ backgroundColor: (i + 1) === 1 ? '#3b82f6' : '#ef4444' }} [cite: 12]
+                        style={{ backgroundColor: (i + 1) === 1 ? '#3b82f6' : '#ef4444' }}
                       >
                         {(i + 1) === 1 ? 'X' : 'O'} 
                       </div>
@@ -435,7 +624,7 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
                   <div className="ready-message">Both players connected!</div>
                   {isRoomCreator ? ( 
                     <button 
-                      onClick={() => { /* startGameRound logic here */ }} // Convert startGameRound
+                      onClick={startGameRound}
                       className="btn-primary"
                     >
                       Start Game
@@ -454,11 +643,11 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
             </div>
 
             <div className="room-actions">
-              <button onClick={() => { /* shareRoom logic here */ }} className="btn-outline">
+              <button onClick={shareRoom} className="btn-outline">
                 <ShareIcon className="w-4 h-4" />
                 Share Room
               </button>
-              <button onClick={() => { /* leaveGame logic here */ }} className="btn-outline">
+              <button onClick={leaveGame} className="btn-outline">
                 <LogOutIcon className="w-4 h-4" />
                 Leave Room 
               </button>
@@ -468,7 +657,7 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
       )}
 
       {/* Game Board */}
-      {gameReady && ( // v-else
+      {gameReady && (
         <div className="game-board-container">
           {/* Game Header */}
           <div className="game-header">
@@ -477,7 +666,7 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
                 <span className="room-label">Room:</span>
                 <span className="room-id">{gameId}</span> 
               </div>
-              <div className={`connection-status ${isConnected ? [cite_start]'connected' : ''}`}> 
+              <div className={`connection-status ${isConnected ? 'connected' : ''}`}> 
                 <div className="status-dot"></div>
                 {isConnected ? 'Connected' : 'Connecting...'} 
               </div>
@@ -527,10 +716,10 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
             {board.map((cell, index) => (
               <div
                 key={index}
-                onClick={() => { /* makeMove logic here */ }} // Convert makeMove
+                onClick={() => { makeMove(index); }}
                 className={`board-cell ${cell === 'X' ? 'has-x' : ''} ${cell === 'O' ? 'has-o' : ''} ${winningCells.includes(index) ? 'winning-cell' : ''}`} 
               >
-                {cell && ( // transition is a bit more complex in React, often needs a dedicated library like react-transition-group
+                {cell && (
                   <span className="cell-content">{cell}</span> 
                 )}
               </div>
@@ -539,15 +728,15 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
 
           {/* Game Controls */}
           <div className="game-controls">
-            <button onClick={() => { /* resetGame logic here */ }} className="btn-outline">
+            <button onClick={resetGame} className="btn-outline">
               <RotateCcwIcon className="w-4 h-4" />
               New Round
             </button>
-            <button onClick={() => { /* leaveGame logic here */ }} className="btn-outline">
+            <button onClick={leaveGame} className="btn-outline">
               <LogOutIcon className="w-4 h-4" /> 
               Leave Room
             </button>
-            <button onClick={() => { /* shareRoom logic here */ }} className="btn-primary">
+            <button onClick={shareRoom} className="btn-primary">
               <ShareIcon className="w-4 h-4" />
               Share Room
             </button>
@@ -568,4 +757,4 @@ const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
   );
 };
 
-export default NostrTicTacToe;
+export default TicTacToe;
