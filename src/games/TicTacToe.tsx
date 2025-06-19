@@ -54,7 +54,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   const sub = useRef<any>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
-  const hasTriedToJoin = useRef(false);
+  const hasJoinedGame = useRef(false);
 
   // Game Logic
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
@@ -167,55 +167,89 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
   }, [pubkey]);
 
   const handleSubscriptionEnd = useCallback(async () => {
-    console.log('Subscription ended, checking if we can join. Current state:', { playerX, playerO, pubkey, gameStarted, hasTriedToJoin: hasTriedToJoin.current });
+    console.log('Subscription ended (EOSE), attempting to join game if not already joined');
     
-    if (pubkey && gameStarted && !hasTriedToJoin.current) {
-      hasTriedToJoin.current = true;
+    if (pubkey && gameStarted && !hasJoinedGame.current) {
+      hasJoinedGame.current = true;
       
-      // Wait a bit to ensure we have the latest state from other players
+      // Wait a moment to ensure we have the latest state
       setTimeout(async () => {
-        console.log('After timeout, current state:', { playerX, playerO, pubkey });
-        let shouldJoin = false;
+        console.log('Current game state:', { playerX, playerO, pubkey });
+        
+        let shouldPublish = false;
         let newPlayerX = playerX;
         let newPlayerO = playerO;
         let newCreatorPubkey = creatorPubkey;
 
-        // Check if we can join as player X
+        // Check if we can join as player X (room creator)
         if (!newPlayerX) {
           newPlayerX = pubkey;
           newCreatorPubkey = pubkey;
           setPlayerX(pubkey);
           setCreatorPubkey(pubkey);
           showToast('You joined as Player X (Room Creator)!', 'success');
-          shouldJoin = true;
-          console.log('Joining as Player X');
+          shouldPublish = true;
+          console.log('Joining as Player X (Room Creator)');
         } 
         // Check if we can join as player O (and we're not already X)
         else if (!newPlayerO && newPlayerX !== pubkey) {
           newPlayerO = pubkey;
           setPlayerO(pubkey);
           showToast('You joined as Player O!', 'success');
-          shouldJoin = true;
+          shouldPublish = true;
           console.log('Joining as Player O');
         }
 
-        // Only publish if we actually joined
-        if (shouldJoin) {
+        // Publish the updated state if we joined
+        if (shouldPublish) {
           console.log('Publishing join state:', { playerX: newPlayerX, playerO: newPlayerO, creatorPubkey: newCreatorPubkey });
-          await publishGameState({
+          
+          // Update version and publish
+          gameStateVersion.current++;
+          const joinState = {
+            board: Array(9).fill(null),
+            currentPlayer: 'X',
+            winner: null,
+            winningCells: [],
+            version: gameStateVersion.current,
+            xWins: 0,
+            oWins: 0,
             playerX: newPlayerX,
             playerO: newPlayerO,
+            gameReady: false,
             creatorPubkey: newCreatorPubkey
-          });
-          
-          // Sync user profile to database
-          await syncUserProfile(pubkey);
+          };
+
+          const event = {
+            kind: 31337,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [['d', gameId]],
+            pubkey,
+            content: JSON.stringify(joinState)
+          };
+
+          try {
+            const signedEvent = await window.nostr.signEvent(event);
+            await Promise.allSettled(pool.current.publish([relayUrl], signedEvent));
+            console.log('Published join state successfully');
+            
+            // Sync user profile to database
+            await syncUserProfile(pubkey);
+          } catch (error) {
+            console.error('Failed to publish join state:', error);
+            showToast('Failed to join game', 'error');
+          }
         } else {
-          console.log('Not joining - room might be full or we are already in');
+          console.log('Cannot join - room might be full or we are already in');
+          if (newPlayerX === pubkey || newPlayerO === pubkey) {
+            console.log('We are already in the game');
+          } else {
+            showToast('Room is full', 'error');
+          }
         }
-      }, 1000);
+      }, 500); // Small delay to ensure we have latest state
     }
-  }, [playerX, playerO, pubkey, publishGameState, creatorPubkey, gameStarted]);
+  }, [playerX, playerO, pubkey, gameStarted, gameId, relayUrl, creatorPubkey]);
 
   const connectToRelay = useCallback(async () => {
     try {
@@ -254,7 +288,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
 
     try {
       setLoading(true);
-      hasTriedToJoin.current = false; // Reset join attempt flag
+      hasJoinedGame.current = false; // Reset join flag
       console.log('Starting game with pubkey:', pubkey, 'gameId:', gameId);
       await connectToRelay();
       setGameStarted(true);
@@ -377,7 +411,7 @@ export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
     if (sub.current) sub.current.close();
     setGameStarted(false);
     setIsConnected(false);
-    hasTriedToJoin.current = false;
+    hasJoinedGame.current = false;
 
     // Reset game state
     setBoard(Array(9).fill(null));
