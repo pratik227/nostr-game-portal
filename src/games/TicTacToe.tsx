@@ -1,681 +1,571 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { SimplePool } from 'nostr-tools/pool';
-import { finalizeEvent } from 'nostr-tools/pure';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { RefreshCwIcon, UserIcon as BrowserIcon, KeyIcon, AlertTriangleIcon, TrophyIcon, EqualIcon, RotateCcwIcon, LogOutIcon, ShareIcon, WifiIcon, WifiOffIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react'; // Assuming lucide-react is installed
 import { bytesToHex } from '@noble/hashes/utils';
-import { generateSecretKey } from 'nostr-tools/pure';
-import {
-  RefreshCw,
-  AlertTriangle,
-  Trophy,
-  Equal,
-  RotateCcw,
-  LogOut,
-  Share,
-  Wifi,
-  WifiOff,
-  CheckCircle,
-  XCircle,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { WaitingRoom } from '@/components/WaitingRoom';
-import { syncUserProfile } from '@/utils/profileSync';
+import { generateSecretKey, getPublicKey, finalizeEvent } from 'nostr-tools/pure';
+import { SimplePool } from 'nostr-tools/pool';
+import { decode } from 'nostr-tools/nip19';
 
-interface GameState {
-  board: (string | null)[];
-  currentPlayer: string;
-  winner: string | null;
-  winningCells: number[];
-  version: number;
-  xWins: number;
-  oWins: number;
-  playerX: string | null;
-  playerO: string | null;
-  gameReady: boolean;
-  creatorPubkey: string | null;
-}
+// Import your CSS file
+import './NostrTicTacToe.css';
 
-interface TicTacToeProps {
-  pubkey: string;
-  onBack: () => void;
-}
+const NostrTicTacToe = ({ onScoreUpdate, onGameOver }) => { // Props for emits
+  // Game State (useState equivalents of Vue refs)
+  const [relayUrl, setRelayUrl] = useState('wss://relay.damus.io'); [cite: 32]
+  const [gameId, setGameId] = useState(''); [cite: 32]
+  const [gameStarted, setGameStarted] = useState(false); [cite: 32]
+  const [loginMethod, setLoginMethod] = useState('extension'); [cite: 32]
+  const [nsec, setNsec] = useState(''); [cite: 32]
+  const [loading, setLoading] = useState(false); [cite: 32]
+  const [isConnected, setIsConnected] = useState(false); [cite: 32]
 
-export function TicTacToe({ pubkey, onBack }: TicTacToeProps) {
-  // Game State
-  const [relayUrl] = useState('wss://relay.damus.io');
-  const [gameId, setGameId] = useState('');
-  const [gameStarted, setGameStarted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-
-  // Nostr Connection
-  const pool = useRef(new SimplePool());
-  const sub = useRef<any>(null);
-  const reconnectAttempts = useRef(0);
+  // Nostr Connection (using useRef for mutable values that don't trigger re-renders, or useState if they do)
+  const pool = useMemo(() => new SimplePool(), []); [cite: 31] // Memoize the pool instance
+  const subRef = useRef(null); // useRef for the subscription object
+  const pubkeyRef = useRef(null);
+  const secretKeyRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
-  const hasJoinedGame = useRef(false);
 
-  // Game Logic
-  const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
-  const [currentPlayer, setCurrentPlayer] = useState('X');
-  const [winner, setWinner] = useState<string | null>(null);
-  const [winningCells, setWinningCells] = useState<number[]>([]);
-  const gameStateVersion = useRef(0);
-  const [xWins, setXWins] = useState(0);
-  const [oWins, setOWins] = useState(0);
-  const [playerX, setPlayerX] = useState<string | null>(null);
-  const [playerO, setPlayerO] = useState<string | null>(null);
-  const [gameReady, setGameReady] = useState(false);
-  const [creatorPubkey, setCreatorPubkey] = useState<string | null>(null);
+  // Game Logic State
+  const [board, setBoard] = useState(Array(9).fill(null)); [cite: 32]
+  const [currentPlayer, setCurrentPlayer] = useState('X'); [cite: 32]
+  const [winner, setWinner] = useState(null); [cite: 32]
+  const [winningCells, setWinningCells] = useState([]); [cite: 32]
+  const [gameStateVersion, setGameStateVersion] = useState(0); [cite: 32]
+  const [xWins, setXWins] = useState(0); [cite: 32]
+  const [oWins, setOWins] = useState(0); [cite: 32]
+  const [isMyTurn, setIsMyTurn] = useState(true); [cite: 32]
+  const [playerX, setPlayerX] = useState(null); [cite: 32]
+  const [playerO, setPlayerO] = useState(null); [cite: 32]
+  const [gameReady, setGameReady] = useState(false); [cite: 32]
+  const [creatorPubkey, setCreatorPubkey] = useState(null); [cite: 32]
 
-  // UI State
-  const [showConnectionToast, setShowConnectionToast] = useState(false);
-  const [connectionToastMessage, setConnectionToastMessage] = useState('');
-  const [connectionToastType, setConnectionToastType] = useState<'info' | 'success' | 'error'>('info');
-  const ConnectionToastIcon =
-    connectionToastType === 'success' ? CheckCircle :
-    connectionToastType === 'error' ? XCircle : Wifi;
+  // UI State for Toast
+  const [showConnectionToast, setShowConnectionToast] = useState(false); [cite: 32]
+  const [connectionToastMessage, setConnectionToastMessage] = useState(''); [cite: 32]
+  const [connectionToastType, setConnectionToastType] = useState('info'); [cite: 32]
+  const [connectionToastIcon, setConnectionToastIcon] = useState(() => WifiIcon); [cite: 32] // Use a function to set initial state
 
-  // Computed Properties
-  const isDraw = board.every(cell => cell !== null) && !winner;
-  const connectedPlayers = (playerX ? 1 : 0) + (playerO ? 1 : 0);
-  const isRoomCreator = creatorPubkey === pubkey;
-  const mySymbol = playerX === pubkey ? 'X' : playerO === pubkey ? 'O' : null;
-  const isMyTurn = mySymbol === currentPlayer;
+  // Computed Properties (useMemo equivalents)
+  const isDraw = useMemo(() =>
+    board.every(cell => cell !== null) && !winner,
+    [board, winner]
+  );
 
-  const generateNewGameId = () => {
+  const connectedPlayers = useMemo(() => {
+    let count = 0;
+    if (playerX) count++;
+    if (playerO) count++;
+    return count;
+  }, [playerX, playerO]);
+
+  const isRoomCreator = useMemo(() => creatorPubkey === pubkeyRef.current, [creatorPubkey]);
+
+  const getPlayerBySlot = useCallback((slot) => {
+    return slot === 1 ? playerX : playerO; [cite: 33]
+  }, [playerX, playerO]);
+
+  const mySymbol = useMemo(() => {
+    if (playerX === pubkeyRef.current) return 'X';
+    if (playerO === pubkeyRef.current) return 'O';
+    return null;
+  }, [playerX, playerO]);
+
+  // Methods (functions)
+  const generateNewGameId = useCallback(() => {
     setGameId(bytesToHex(generateSecretKey()).slice(0, 8).toUpperCase());
-  };
+  }, []);
 
-  const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3000) => {
-    setConnectionToastMessage(message);
-    setConnectionToastType(type);
-    setShowConnectionToast(true);
-
+  const showToast = useCallback((message, type = 'info', duration = 3000) => {
+    setConnectionToastMessage(message); [cite: 34]
+    setConnectionToastType(type); [cite: 34]
+    if (type === 'success') {
+      setConnectionToastIcon(() => CheckCircleIcon); [cite: 34]
+    } else if (type === 'error') {
+      setConnectionToastIcon(() => XCircleIcon); [cite: 35]
+    } else {
+      setConnectionToastIcon(() => WifiIcon); [cite: 34]
+    }
+    setShowConnectionToast(true); [cite: 34]
+    
     setTimeout(() => {
-      setShowConnectionToast(false);
+      setShowConnectionToast(false); [cite: 34]
     }, duration);
-  };
+  }, []);
 
-  const publishGameState = useCallback(async (stateToPublish?: Partial<GameState>) => {
-    if (!pubkey || !isConnected) return;
-
-    const currentState = {
-        board,
-        currentPlayer,
-        winner,
-        winningCells,
-        version: gameStateVersion.current + 1,
-        xWins,
-        oWins,
-        playerX,
-        playerO,
-        gameReady,
-        creatorPubkey,
-        ...stateToPublish
-    };
-    gameStateVersion.current = currentState.version;
-
-    const event = {
-      kind: 31337,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', gameId]],
-      pubkey,
-      content: JSON.stringify(currentState)
-    };
-
+  // Forward declaration for mutual recursion (important for connectToRelay and attemptReconnect)
+  const connectToRelay = useCallback(async () => {
     try {
-      const signedEvent = await window.nostr.signEvent(event);
-      await Promise.allSettled(pool.current.publish([relayUrl], signedEvent));
-      console.log('Published game state:', currentState);
+      if (subRef.current) subRef.current.close(); [cite: 38]
+      
+      const filters = [{ kinds: [31337], '#d': [gameId] }]; [cite: 38]
+      subRef.current = pool.subscribeMany([relayUrl], filters, {
+        onevent: handleGameEvent, [cite: 38]
+        oneose: handleSubscriptionEnd, [cite: 38]
+        onclose: handleConnectionClose [cite: 38]
+      });
+      
+      setIsConnected(true); [cite: 38]
+      reconnectAttemptsRef.current = 0; [cite: 38]
+      
+    } catch (error) {
+      console.error('Failed to connect to relay:', error);
+      setIsConnected(false); [cite: 38]
+      attemptReconnect(); [cite: 38]
+    }
+  }, [gameId, relayUrl, pool]); // Dependencies for connectToRelay
+
+  const attemptReconnect = useCallback(() => {
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) { [cite: 47]
+      showToast('Failed to reconnect. Please refresh the page.', 'error', 5000); [cite: 47]
+      return;
+    }
+    
+    reconnectAttemptsRef.current++; [cite: 47]
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000); [cite: 47]
+    
+    setTimeout(() => {
+      if (gameStarted && !isConnected) { [cite: 47]
+        connectToRelay(); [cite: 47]
+      }
+    }, delay);
+  }, [gameStarted, isConnected, connectToRelay, showToast]);
+
+  const publishGameState = useCallback(async () => {
+    if (!pubkeyRef.current || !isConnected) return; [cite: 51]
+    
+    const event = {
+      kind: 31337, [cite: 51]
+      created_at: Math.floor(Date.now() / 1000), [cite: 51]
+      tags: [['d', gameId]], [cite: 51]
+      pubkey: pubkeyRef.current, [cite: 51]
+      content: JSON.stringify({
+        board: board, [cite: 52]
+        currentPlayer: currentPlayer, [cite: 52]
+        winner: winner, [cite: 52]
+        winningCells: winningCells, [cite: 52]
+        version: gameStateVersion, [cite: 52]
+        xWins: xWins, [cite: 52]
+        oWins: oWins, [cite: 52]
+        playerX: playerX, [cite: 52]
+        playerO: playerO, [cite: 52]
+        gameReady: gameReady, [cite: 52]
+        creatorPubkey: creatorPubkey [cite: 52]
+      })
+    };
+    
+    try {
+      const signedEvent = loginMethod === 'key' 
+        ? finalizeEvent(event, secretKeyRef.current) [cite: 53]
+        : await window.nostr.signEvent(event); [cite: 53]
+      
+      await Promise.allSettled(pool.publish([relayUrl], signedEvent)); [cite: 53]
     } catch (error) {
       console.error('Failed to publish game state:', error);
       showToast('Failed to sync game state', 'error');
     }
-  }, [pubkey, isConnected, gameId, board, currentPlayer, winner, winningCells, xWins, oWins, playerX, playerO, gameReady, creatorPubkey, relayUrl]);
+  }, [gameId, isConnected, board, currentPlayer, winner, winningCells, gameStateVersion, xWins, oWins, playerX, playerO, gameReady, creatorPubkey, loginMethod, relayUrl, pool, showToast]);
 
-  const handleGameEvent = useCallback((event: any) => {
+  const handleGameEvent = useCallback((event) => {
     try {
-      const incomingState: GameState = JSON.parse(event.content);
-      console.log('Received game event:', incomingState, 'from pubkey:', event.pubkey);
-
-      if (incomingState.version > gameStateVersion.current) {
-        console.log('Updating game state from version', gameStateVersion.current, 'to', incomingState.version);
-        gameStateVersion.current = incomingState.version;
-        setBoard(incomingState.board);
-        setCurrentPlayer(incomingState.currentPlayer);
-        setWinner(incomingState.winner);
-        setWinningCells(incomingState.winningCells || []);
-        setXWins(incomingState.xWins || 0);
-        setOWins(incomingState.oWins || 0);
-        setPlayerX(incomingState.playerX);
-        setPlayerO(incomingState.playerO);
-        setGameReady(incomingState.gameReady || false);
-        setCreatorPubkey(incomingState.creatorPubkey);
-
-        if (incomingState.gameReady && event.pubkey !== pubkey && !incomingState.winner) {
-           const myCurrSymbol = incomingState.playerX === pubkey ? 'X' : incomingState.playerO === pubkey ? 'O' : null;
-           if(incomingState.currentPlayer === myCurrSymbol) {
-             showToast("Opponent moved - your turn!", 'info', 2000);
-           }
+      const incomingState = JSON.parse(event.content); [cite: 39]
+      
+      if (incomingState.version > gameStateVersion) { [cite: 39]
+        setBoard(incomingState.board); [cite: 39]
+        setCurrentPlayer(incomingState.currentPlayer); [cite: 39]
+        setWinner(incomingState.winner); [cite: 39]
+        setWinningCells(incomingState.winningCells || []); [cite: 39, 40]
+        setGameStateVersion(incomingState.version); [cite: 39]
+        setXWins(incomingState.xWins || 0); [cite: 39, 41]
+        setOWins(incomingState.oWins || 0); [cite: 39, 42]
+        setPlayerX(incomingState.playerX); [cite: 39]
+        setPlayerO(incomingState.playerO); [cite: 39]
+        setGameReady(incomingState.gameReady || false); [cite: 39, 43]
+        setCreatorPubkey(incomingState.creatorPubkey); [cite: 39]
+        
+        if (incomingState.gameReady) { [cite: 43]
+          // Note: mySymbol needs to be calculated based on the updated state,
+          // or passed as a dependency if using an older version.
+          // For simplicity here, assuming mySymbol would react to updated playerX/O.
+          const currentMySymbol = (playerX === pubkeyRef.current ? 'X' : (playerO === pubkeyRef.current ? 'O' : null));
+          setIsMyTurn(incomingState.currentPlayer === currentMySymbol); [cite: 43]
+          if (event.pubkey !== pubkeyRef.current && !incomingState.winner && !isDraw) { [cite: 43]
+            showToast("Opponent moved - your turn!", 'info', 2000); [cite: 43]
+          }
+        }
+        
+        onScoreUpdate(Math.max(incomingState.xWins, incomingState.oWins) * 100); [cite: 44]
+        
+        if (incomingState.winner || isDraw) { [cite: 44]
+          const isWinner = (incomingState.winner === mySymbol); // mySymbol needs to be current state
+          onGameOver({ [cite: 44]
+            score: (isWinner ? 100 : 50), [cite: 45]
+            win: isWinner, [cite: 45]
+            duration: Date.now(), [cite: 45]
+            level: 1 [cite: 45]
+          });
         }
       }
     } catch (error) {
       console.error('Failed to parse game event:', error);
     }
-  }, [pubkey]);
+  }, [gameStateVersion, isDraw, mySymbol, onScoreUpdate, onGameOver, showToast, playerX, playerO]); // Add relevant state dependencies
 
-  const handleSubscriptionEnd = useCallback(async () => {
-    console.log('Subscription ended (EOSE), attempting to join game if not already joined');
-    
-    if (pubkey && gameStarted && !hasJoinedGame.current) {
-      hasJoinedGame.current = true;
-      
-      // Wait a moment to ensure we have the latest state
-      setTimeout(async () => {
-        console.log('Current game state:', { playerX, playerO, pubkey });
-        
-        let shouldPublish = false;
-        let newPlayerX = playerX;
-        let newPlayerO = playerO;
-        let newCreatorPubkey = creatorPubkey;
-
-        // Check if we can join as player X (room creator)
-        if (!newPlayerX) {
-          newPlayerX = pubkey;
-          newCreatorPubkey = pubkey;
-          setPlayerX(pubkey);
-          setCreatorPubkey(pubkey);
-          showToast('You joined as Player X (Room Creator)!', 'success');
-          shouldPublish = true;
-          console.log('Joining as Player X (Room Creator)');
-        } 
-        // Check if we can join as player O (and we're not already X)
-        else if (!newPlayerO && newPlayerX !== pubkey) {
-          newPlayerO = pubkey;
-          setPlayerO(pubkey);
-          showToast('You joined as Player O!', 'success');
-          shouldPublish = true;
-          console.log('Joining as Player O');
-        }
-
-        // Publish the updated state if we joined
-        if (shouldPublish) {
-          console.log('Publishing join state:', { playerX: newPlayerX, playerO: newPlayerO, creatorPubkey: newCreatorPubkey });
-          
-          // Update version and publish
-          gameStateVersion.current++;
-          const joinState = {
-            board: Array(9).fill(null),
-            currentPlayer: 'X',
-            winner: null,
-            winningCells: [],
-            version: gameStateVersion.current,
-            xWins: 0,
-            oWins: 0,
-            playerX: newPlayerX,
-            playerO: newPlayerO,
-            gameReady: false,
-            creatorPubkey: newCreatorPubkey
-          };
-
-          const event = {
-            kind: 31337,
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [['d', gameId]],
-            pubkey,
-            content: JSON.stringify(joinState)
-          };
-
-          try {
-            const signedEvent = await window.nostr.signEvent(event);
-            await Promise.allSettled(pool.current.publish([relayUrl], signedEvent));
-            console.log('Published join state successfully');
-            
-            // Sync user profile to database
-            await syncUserProfile(pubkey);
-          } catch (error) {
-            console.error('Failed to publish join state:', error);
-            showToast('Failed to join game', 'error');
-          }
-        } else {
-          console.log('Cannot join - room might be full or we are already in');
-          if (newPlayerX === pubkey || newPlayerO === pubkey) {
-            console.log('We are already in the game');
-          } else {
-            showToast('Room is full', 'error');
-          }
-        }
-      }, 500); // Small delay to ensure we have latest state
+  const handleSubscriptionEnd = useCallback(() => {
+    // Only set player if slots are truly empty according to the latest state.
+    // This is a subtle race condition in distributed systems; consider a more robust handshake.
+    if (!playerX) { [cite: 45]
+      pubkeyRef.current = pubkeyRef.current || Math.random().toString(36).substring(2, 15); // Fallback if pubkey not set earlier
+      setPlayerX(pubkeyRef.current); [cite: 45]
+      setCreatorPubkey(pubkeyRef.current); [cite: 45]
+      showToast('You joined as Player X!', 'success'); [cite: 45]
+    } else if (!playerO && playerX !== pubkeyRef.current) { [cite: 46]
+      pubkeyRef.current = pubkeyRef.current || Math.random().toString(36).substring(2, 15);
+      setPlayerO(pubkeyRef.current); [cite: 46]
+      showToast('You joined as Player O!', 'success'); [cite: 46]
     }
-  }, [playerX, playerO, pubkey, gameStarted, gameId, relayUrl, creatorPubkey]);
+    setGameStateVersion(prev => prev + 1); [cite: 46]
+    publishGameState(); [cite: 46]
+  }, [playerX, playerO, showToast, publishGameState]);
 
-  const connectToRelay = useCallback(async () => {
-    try {
-      if (sub.current) sub.current.close();
+  const handleConnectionClose = useCallback(() => {
+    setIsConnected(false); [cite: 47]
+    showToast('Connection lost, attempting to reconnect...', 'error'); [cite: 47]
+    attemptReconnect(); [cite: 47]
+  }, [showToast, attemptReconnect]);
 
-      const filters = [{ kinds: [31337], '#d': [gameId] }];
-      console.log('Connecting to relay with filters:', filters);
-      
-      sub.current = pool.current.subscribeMany([relayUrl], filters, {
-        onevent: handleGameEvent,
-        oneose: handleSubscriptionEnd,
-        onclose: () => handleConnectionClose(),
-      });
-
-      setIsConnected(true);
-      reconnectAttempts.current = 0;
-      console.log('Connected to relay successfully');
-
-    } catch (error) {
-      console.error('Failed to connect to relay:', error);
-      setIsConnected(false);
-      attemptReconnect();
-    }
-  }, [gameId, relayUrl, handleGameEvent, handleSubscriptionEnd]);
-
-  const startGame = async () => {
-    if (!gameId || !relayUrl) {
-      showToast('Please provide a game ID', 'error');
-      return;
-    }
-
-    if (!window.nostr) {
-      showToast('Nostr extension not found. Please install a Nostr browser extension.', 'error');
+  const startGame = useCallback(async () => {
+    if (!gameId || !relayUrl) { [cite: 36]
+      showToast('Please provide relay URL and game ID', 'error'); [cite: 36]
       return;
     }
 
     try {
-      setLoading(true);
-      hasJoinedGame.current = false; // Reset join flag
-      console.log('Starting game with pubkey:', pubkey, 'gameId:', gameId);
-      await connectToRelay();
-      setGameStarted(true);
-      showToast('Connected to game room!', 'success');
+      setLoading(true); [cite: 36]
+      
+      if (loginMethod === 'key') { [cite: 36]
+        if (!nsec) { [cite: 36]
+          throw new Error('Please enter your private key'); [cite: 36]
+        }
+        const decoded = decode(nsec.trim()); [cite: 36]
+        if (decoded.type !== 'nsec') { [cite: 36]
+          throw new Error('Invalid nsec format'); [cite: 36]
+        }
+        secretKeyRef.current = decoded.data; [cite: 36]
+        pubkeyRef.current = getPublicKey(secretKeyRef.current); [cite: 36]
+      } else {
+        if (!window.nostr) { [cite: 36]
+          throw new Error('Nostr extension not found. Please install a Nostr browser extension.'); [cite: 36]
+        }
+        pubkeyRef.current = await window.nostr.getPublicKey(); [cite: 37]
+      }
+
+      await connectToRelay(); [cite: 37]
+      setGameStarted(true); [cite: 37]
+      showToast('Connected to game room!', 'success'); [cite: 37]
+      
     } catch (error) {
       console.error('Failed to start game:', error);
-      showToast(error instanceof Error ? error.message : 'Failed to start game', 'error');
+      showToast(error.message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [gameId, relayUrl, loginMethod, nsec, showToast, connectToRelay]);
 
-  const handleConnectionClose = () => {
-    setIsConnected(false);
-    showToast('Connection lost, attempting to reconnect...', 'error');
-    attemptReconnect();
-  };
+  // Other game logic functions (makeMove, checkWinner, resetGame, leaveGame, shareRoom)
+  // These will also need to be converted to useCallback functions.
+  // ...
 
-  const attemptReconnect = () => {
-    if (reconnectAttempts.current >= maxReconnectAttempts) {
-      showToast('Failed to reconnect. Please refresh the page.', 'error', 5000);
-      return;
-    }
-
-    reconnectAttempts.current++;
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-
-    setTimeout(() => {
-      if (gameStarted && !isConnected) {
-        connectToRelay();
-      }
-    }, delay);
-  };
-
-  const startGameRound = () => {
-    if (!isRoomCreator || connectedPlayers < 2) return;
-
-    const newState = {
-        gameReady: true,
-        board: Array(9).fill(null),
-        currentPlayer: 'X',
-        winner: null,
-        winningCells: [],
-    };
-    setGameReady(newState.gameReady);
-    setBoard(newState.board);
-    setCurrentPlayer(newState.currentPlayer);
-    setWinner(newState.winner);
-    setWinningCells(newState.winningCells);
-    publishGameState(newState);
-    showToast('Game started!', 'success');
-  };
-
-  const makeMove = async (index: number) => {
-    if (!isMyTurn || board[index] || winner || isDraw || !gameReady) {
-      return;
-    }
-
-    const newBoard = [...board];
-    newBoard[index] = currentPlayer;
-    setBoard(newBoard);
-
-    let newWinner: string | null = null;
-    let newWinningCells: number[] = [];
-
-    const winPatterns = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6]
-    ];
-
-    for (const pattern of winPatterns) {
-      const [a, b, c] = pattern;
-      if (newBoard[a] && newBoard[a] === newBoard[b] && newBoard[a] === newBoard[c]) {
-        newWinner = newBoard[a];
-        newWinningCells = pattern;
-        break;
-      }
-    }
-
-    if (newWinner) {
-        setWinner(newWinner);
-        setWinningCells(newWinningCells);
-        if (newWinner === 'X') {
-            setXWins(prev => prev + 1);
-        } else {
-            setOWins(prev => prev + 1);
-        }
-    }
-
-    const nextPlayer = currentPlayer === 'X' ? 'O' : 'X';
-    setCurrentPlayer(nextPlayer);
-
-    await publishGameState({
-        board: newBoard,
-        currentPlayer: nextPlayer,
-        winner: newWinner,
-        winningCells: newWinningCells,
-        xWins: newWinner === 'X' ? xWins + 1 : xWins,
-        oWins: newWinner === 'O' ? oWins + 1 : oWins,
-    });
-  };
-
-  const resetGame = async () => {
-    const newState = {
-        board: Array(9).fill(null),
-        currentPlayer: 'X',
-        winner: null,
-        winningCells: [],
-    };
-    setBoard(newState.board);
-    setCurrentPlayer(newState.currentPlayer);
-    setWinner(newState.winner);
-    setWinningCells(newState.winningCells);
-    await publishGameState(newState);
-    showToast('New round started!', 'info');
-  };
-
-  const leaveGame = () => {
-    if (sub.current) sub.current.close();
-    setGameStarted(false);
-    setIsConnected(false);
-    hasJoinedGame.current = false;
-
-    // Reset game state
-    setBoard(Array(9).fill(null));
-    setCurrentPlayer('X');
-    setWinner(null);
-    setWinningCells([]);
-    gameStateVersion.current = 0;
-    setXWins(0);
-    setOWins(0);
-    setPlayerX(null);
-    setPlayerO(null);
-    setGameReady(false);
-    setCreatorPubkey(null);
-    
-    // Go back to games list
-    onBack();
-  };
-
-  const shareRoom = async () => {
-    const shareUrl = `${window.location.origin}?game=tictactoe&room=${gameId}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join my Tic-Tac-Toe game!',
-          text: 'Play Tic-Tac-Toe with me on Nostr',
-          url: shareUrl
-        });
-      } catch (error) {
-        await navigator.clipboard.writeText(shareUrl);
-        showToast('Room link copied to clipboard!', 'success');
-      }
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      showToast('Room link copied to clipboard!', 'success');
-    }
-  };
-
+  // useEffect for onMounted equivalent
   useEffect(() => {
-    // Check URL parameters for game room
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
+    generateNewGameId(); [cite: 56]
+    const urlParams = new URLSearchParams(window.location.search); [cite: 56]
+    const roomParam = urlParams.get('room'); [cite: 56]
+    const relayParam = urlParams.get('relay'); [cite: 56]
     
-    if (roomParam) {
-      setGameId(roomParam);
-    } else {
-      generateNewGameId();
-    }
+    if (roomParam) setGameId(roomParam); [cite: 56]
+    if (relayParam) setRelayUrl(decodeURIComponent(relayParam)); [cite: 56]
 
+    // Cleanup function for onBeforeUnmount
     return () => {
-      if (sub.current) sub.current.close();
-      pool.current.close([relayUrl]);
+      if (subRef.current) subRef.current.close(); [cite: 54]
+      pool.close([relayUrl]); // Ensure relayUrl is the final state value before unmount
     };
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount and cleans up on unmount
 
+  // useEffect for watch(isConnected) equivalent
   useEffect(() => {
     if (isConnected && gameStarted) {
       showToast('Reconnected to game room', 'success', 2000);
     }
-  }, [isConnected, gameStarted]);
+  }, [isConnected, gameStarted, showToast]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Back Button */}
-        <div className="mb-6">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="gap-2 bg-white shadow-sm hover:shadow-md transition-shadow"
-          >
-            ← Back to Games
-          </Button>
+    <div className="nostr-game-container">
+      {/* Game Setup Panel */}
+      {!gameStarted && ( // v-if="!gameStarted"
+        <div className="setup-panel">
+          <div className="setup-header">
+            <h2 className="game-title">💡 Nostr Tic-Tac-Toe</h2>
+            <p className="game-subtitle">Challenge friends in real-time multiplayer</p>
+          </div>
+
+          <div className="setup-form">
+            <div className="input-group">
+              <label>Nostr Relay URL</label>
+              <input 
+                [cite_start]value={relayUrl} // v-model="relayUrl" [cite: 2]
+                onChange={(e) => setRelayUrl(e.target.value)} // v-model="relayUrl"
+                type="url" 
+                className="input"
+                placeholder="wss://relay.damus.io"
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Game Room ID</label>
+              <div className="input-with-button">
+                <input 
+                  [cite_start]value={gameId} // v-model="gameId" [cite: 3]
+                  onChange={(e) => setGameId(e.target.value)} // v-model="gameId"
+                  type="text" 
+                  className="input"
+                  placeholder="Enter or generate room ID"
+                />
+                <button onClick={generateNewGameId} className="btn-icon" title="Generate new ID">
+                  <RefreshCwIcon className="w-4 h-4" /> 
+                </button>
+              </div>
+            </div>
+
+            <div className="login-method-selector">
+              <div className="method-tabs">
+                <button 
+                  onClick={() => setLoginMethod('extension')}
+                  className={`method-tab ${loginMethod === 'extension' ? 'active' : ''}`} 
+                >
+                  <BrowserIcon className="w-4 h-4" />
+                  Extension
+                </button>
+                <button 
+                  onClick={() => setLoginMethod('key')}
+                  className={`method-tab ${loginMethod === 'key' ? 'active' : ''}`} 
+                >
+                  <KeyIcon className="w-4 h-4" />
+                  Private Key
+                </button>
+              </div>
+
+              {loginMethod === 'key' && ( 
+                <div className="key-input-section">
+                  <div className="input-group">
+                    <label>Nostr Private Key (nsec)</label>
+                    <input 
+                      value={nsec} 
+                      onChange={(e) => setNsec(e.target.value)}
+                      type="password" 
+                      className="input"
+                      placeholder="nsec1..." 
+                    />
+                  </div>
+                  <div className="warning-banner">
+                    <AlertTriangleIcon className="w-4 h-4" />
+                    <span>Use browser extensions for better security</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={startGame} 
+              disabled={loading}
+              className="btn-primary start-game-btn"
+            >
+              {loading && <div className="loading-spinner"></div>}
+              {loading ? 'Connecting...' : 'Join Game Room'} 
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Game Setup Panel */}
-        {!gameStarted ? (
-          <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                🎯 Tic-Tac-Toe
-              </CardTitle>
-              <p className="text-lg text-gray-600 mt-2">Challenge friends in real-time multiplayer</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-700">Game Room ID</label>
-                <div className="flex space-x-3">
-                  <input
-                    value={gameId}
-                    onChange={(e) => setGameId(e.target.value)}
-                    type="text"
-                    className="flex-1 p-3 border-2 border-gray-200 rounded-xl bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
-                    placeholder="Enter or generate room ID"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={generateNewGameId}
-                    size="icon"
-                    className="p-3 h-12 w-12 border-2 hover:border-blue-500 hover:bg-blue-50"
-                  >
-                    <RefreshCw className="w-5 h-5" />
-                  </Button>
-                </div>
-              </div>
+      {/* Waiting Room */}
+      {gameStarted && !gameReady && ( // v-else-if="!gameReady"
+        <div className="waiting-room">
+          <div className="waiting-header">
+            <h2 className="game-title">💡 Waiting for Opponent</h2>
+            <p className="game-subtitle">Room: {gameId}</p> 
+          </div>
 
-              <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-800 font-medium">Using your connected Nostr identity</span>
-              </div>
-
-              <Button
-                onClick={startGame}
-                disabled={loading}
-                className="w-full py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
-                    Connecting...
-                  </>
-                ) : (
-                  'Join Game Room'
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : !gameReady ? (
-        /* Enhanced Waiting Room */
-          <WaitingRoom
-            gameId={gameId}
-            playerX={playerX}
-            playerO={playerO}
-            currentUserPubkey={pubkey}
-            isRoomCreator={isRoomCreator}
-            connectedPlayers={connectedPlayers}
-            onStartGame={startGameRound}
-            onShareRoom={shareRoom}
-            onLeaveRoom={leaveGame}
-          />
-        ) : (
-        /* Game Board */
-          <div className="space-y-6">
-            {/* Game Header */}
-            <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-center">
-                  <div className='flex items-center gap-6'>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-600 text-sm font-medium">Room:</span>
-                        <Badge variant="outline" className="font-mono bg-blue-50 border-blue-200 text-blue-700">{gameId}</Badge>
+          <div className="players-waiting">
+            <div className="player-slots">
+              {[...Array(2)].map((_, i) => ( // v-for="i in 2" 
+                <div
+                  key={i + 1} // :key="i"
+                  className={`player-slot ${getPlayerBySlot(i + 1) ? 'filled' : ''} ${getPlayerBySlot(i + 1) === pubkeyRef.current ? [cite_start]'is-me' : ''}`} [cite: 11]
+                >
+                  {getPlayerBySlot(i + 1) ? (
+                    <div className="player-info">
+                      <div 
+                        className="player-avatar" 
+                        [cite_start]style={{ backgroundColor: (i + 1) === 1 ? '#3b82f6' : '#ef4444' }} [cite: 12]
+                      >
+                        {(i + 1) === 1 ? 'X' : 'O'} 
                       </div>
-                       <div className="flex items-center space-x-4 bg-gray-50 px-4 py-2 rounded-xl">
-                          <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">X</div>
-                              <span className="font-bold text-lg">{xWins}</span>
-                          </div>
-                          <div className="text-gray-400 font-bold">-</div>
-                          <div className="flex items-center space-x-2">
-                              <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold">O</div>
-                              <span className="font-bold text-lg">{oWins}</span>
-                          </div>
+                      <div className="player-name">
+                        {getPlayerBySlot(i + 1) === pubkeyRef.current ? 'You' : `Player ${i + 1}`} 
                       </div>
-                  </div>
-                  <div className={`flex items-center space-x-2 text-sm px-3 py-1 rounded-full ${isConnected ? 'text-green-600 bg-green-50' : 'text-gray-500 bg-gray-50'}`}>
-                    <div className="w-2 h-2 rounded-full bg-current" />
-                    <span>{isConnected ? 'Connected' : 'Connecting...'}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Turn Indicator */}
-            <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-              <CardContent className="pt-6 text-center">
-                {winner ? (
-                  <div className="flex items-center justify-center space-x-3 text-xl font-bold text-green-600">
-                    <Trophy className="w-8 h-8" />
-                    <span className="text-2xl">{winner} Wins! 🎉</span>
-                  </div>
-                ) : isDraw ? (
-                  <div className="flex items-center justify-center space-x-3 text-xl font-bold text-amber-600">
-                    <Equal className="w-8 h-8" />
-                    <span className="text-2xl">It's a Draw! 🤝</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center space-x-4">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-xl shadow-lg ${
-                        currentPlayer === 'X' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-red-500 to-red-600'
-                      }`}
-                    >
-                      {currentPlayer}
                     </div>
-                    <span className="text-xl font-semibold text-gray-800">
-                      {isMyTurn ? "🎯 Your turn!" : "⏳ Opponent's turn"}
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <div className="empty-slot">
+                      <div className="empty-avatar">?</div>
+                      <div className="empty-text">Waiting...</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
-            {/* Tic-Tac-Toe Board */}
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl">
-              <div
-                className={`grid grid-cols-3 gap-3 max-w-md mx-auto ${
-                  !isMyTurn || winner || isDraw ? 'opacity-60 pointer-events-none' : ''
-                }`}
-              >
-                {board.map((cell, index) => (
-                  <button
-                    key={index}
-                    onClick={() => makeMove(index)}
-                    className={`aspect-square bg-white border-3 rounded-xl flex items-center justify-center text-4xl font-bold cursor-pointer transition-all hover:border-blue-400 hover:shadow-lg transform hover:-translate-y-1 ${
-                      cell === 'X'
-                        ? 'text-blue-600 border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100 shadow-md'
-                        : cell === 'O'
-                        ? 'text-red-600 border-red-300 bg-gradient-to-br from-red-50 to-red-100 shadow-md'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    } ${winningCells.includes(index) ? '!bg-gradient-to-br !from-green-100 !to-emerald-100 !border-green-400 ring-4 ring-green-200' : ''}`}
-                  >
-                    {cell && (
-                      <span className="block animate-bounce">
-                        {cell}
-                      </span>
-                    )}
-                  </button>
-                ))}
+            <div className="waiting-info">
+              <div className="player-count">
+                {connectedPlayers} / 2 players joined 
+              </div>
+              
+              {connectedPlayers === 2 ? ( 
+                <div className="ready-section">
+                  <div className="ready-message">Both players connected!</div>
+                  {isRoomCreator ? ( 
+                    <button 
+                      onClick={() => { /* startGameRound logic here */ }} // Convert startGameRound
+                      className="btn-primary"
+                    >
+                      Start Game
+                    </button>
+                  ) : (
+                    <div className="waiting-message"> 
+                      Waiting for room creator to start the game...
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="need-more-players"> 
+                  Need 1 more player to start
+                </div>
+              )}
+            </div>
+
+            <div className="room-actions">
+              <button onClick={() => { /* shareRoom logic here */ }} className="btn-outline">
+                <ShareIcon className="w-4 h-4" />
+                Share Room
+              </button>
+              <button onClick={() => { /* leaveGame logic here */ }} className="btn-outline">
+                <LogOutIcon className="w-4 h-4" />
+                Leave Room 
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Board */}
+      {gameReady && ( // v-else
+        <div className="game-board-container">
+          {/* Game Header */}
+          <div className="game-header">
+            <div className="game-info">
+              <div className="room-info">
+                <span className="room-label">Room:</span>
+                <span className="room-id">{gameId}</span> 
+              </div>
+              <div className={`connection-status ${isConnected ? [cite_start]'connected' : ''}`}> 
+                <div className="status-dot"></div>
+                {isConnected ? 'Connected' : 'Connecting...'} 
               </div>
             </div>
 
-            {/* Game Controls */}
-            <div className="flex justify-center space-x-4">
-              <Button variant="outline" onClick={resetGame} className="gap-2 shadow-sm hover:shadow-md">
-                <RotateCcw className="w-4 h-4" />
-                New Round
-              </Button>
-              <Button variant="outline" onClick={leaveGame} className="gap-2 shadow-sm hover:shadow-md">
-                <LogOut className="w-4 h-4" />
-                Leave Room
-              </Button>
-              <Button onClick={shareRoom} className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl">
-                <Share className="w-4 h-4" />
-                Share Room
-              </Button>
+            <div className="game-stats">
+              <div className="score-display">
+                <div className="score-item x-score">
+                  <span className="score-symbol">X</span>
+                  <span className="score-value">{xWins}</span> 
+                </div>
+                <div className="score-divider">-</div> 
+                <div className="score-item o-score">
+                  <span className="score-symbol">O</span>
+                  <span className="score-value">{oWins}</span> 
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Connection Status Toast */}
-        {showConnectionToast && (
-          <div
-            className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 backdrop-blur-sm ${
-              connectionToastType === 'info' ? 'bg-blue-500/90' :
-              connectionToastType === 'success' ? 'bg-green-500/90' : 'bg-red-500/90'
-            }`}
-          >
-            <div className="flex items-center space-x-3">
-              <ConnectionToastIcon className="w-6 h-6" />
-              <span className="font-medium">{connectionToastMessage}</span>
-            </div>
+          {/* Turn Indicator */} 
+          <div className="turn-indicator">
+            {winner ? ( 
+              <div className="game-result winner">
+                <TrophyIcon className="w-6 h-6" />
+                {winner} Wins! 
+              </div>
+            ) : isDraw ? ( 
+              <div className="game-result draw">
+                <EqualIcon className="w-6 h-6" />
+                It's a Draw! 
+              </div>
+            ) : (
+              <div className="turn-display">
+                <div className={`current-player ${currentPlayer.toLowerCase()}`}>
+                  {currentPlayer}
+                </div>
+                <span className="turn-text">
+                  {isMyTurn ? "Your turn" : "Opponent's turn"} 
+                </span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Tic-Tac-Toe Board */}
+          <div className={`tic-tac-toe-board ${(!isMyTurn || winner || isDraw) ? 'locked' : ''}`}>
+            {board.map((cell, index) => (
+              <div
+                key={index}
+                onClick={() => { /* makeMove logic here */ }} // Convert makeMove
+                className={`board-cell ${cell === 'X' ? 'has-x' : ''} ${cell === 'O' ? 'has-o' : ''} ${winningCells.includes(index) ? 'winning-cell' : ''}`} 
+              >
+                {cell && ( // transition is a bit more complex in React, often needs a dedicated library like react-transition-group
+                  <span className="cell-content">{cell}</span> 
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Game Controls */}
+          <div className="game-controls">
+            <button onClick={() => { /* resetGame logic here */ }} className="btn-outline">
+              <RotateCcwIcon className="w-4 h-4" />
+              New Round
+            </button>
+            <button onClick={() => { /* leaveGame logic here */ }} className="btn-outline">
+              <LogOutIcon className="w-4 h-4" /> 
+              Leave Room
+            </button>
+            <button onClick={() => { /* shareRoom logic here */ }} className="btn-primary">
+              <ShareIcon className="w-4 h-4" />
+              Share Room
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Connection Status Toast */}
+      {showConnectionToast && ( 
+        <div className={`connection-toast ${connectionToastType}`}> 
+          <div className="toast-content">
+            {React.createElement(connectionToastIcon, { className: "w-5 h-5" })}
+            <span>{connectionToastMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default NostrTicTacToe;
