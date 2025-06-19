@@ -59,7 +59,11 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
     return count;
   }, [playerX, playerO]);
 
-  const isRoomCreator = useMemo(() => creatorPubkey === pubkeyRef.current, [creatorPubkey]);
+  const isRoomCreator = useMemo(() => {
+    const result = creatorPubkey === pubkeyRef.current;
+    console.log('isRoomCreator check:', { creatorPubkey, currentPubkey: pubkeyRef.current, result });
+    return result;
+  }, [creatorPubkey]);
 
   const getPlayerBySlot = useCallback((slot) => {
     return slot === 1 ? playerX : playerO;
@@ -227,12 +231,13 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
           setPlayerO(pubkeyRef.current);
           showToast('You joined as Player O!', 'success');
           setGameStateVersion(incomingState.version + 1);
-          // Publish immediately with the current state values
+          // Publish immediately with the current state values - preserve creatorPubkey
           setTimeout(() => {
             publishGameStateWithValues({
               ...incomingState,
               playerO: pubkeyRef.current,
-              version: incomingState.version + 1
+              version: incomingState.version + 1,
+              creatorPubkey: incomingState.creatorPubkey // Explicitly preserve the creator
             });
           }, 100);
         }
@@ -309,8 +314,9 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       // Wait a bit to see if there's an existing game state
       // If not, we'll be the room creator and Player X
       setTimeout(() => {
-        if (!playerX && !playerO) {
+        if (!playerX && !playerO && !creatorPubkey) {
           // No existing players, we're the first/creator
+          console.log('Becoming room creator:', pubkeyRef.current);
           setPlayerX(pubkeyRef.current);
           setCreatorPubkey(pubkeyRef.current);
           setGameStateVersion(1);
@@ -331,9 +337,11 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
               creatorPubkey: pubkeyRef.current
             });
           }, 100);
+        } else {
+          console.log('Not becoming creator - existing state found:', { playerX, playerO, creatorPubkey });
         }
         // If there are existing players, handleGameEvent will handle joining
-      }, 500);
+      }, 800);
       
     } catch (error) {
       console.error('Failed to start game:', error);
@@ -622,6 +630,10 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
               {connectedPlayers === 2 ? ( 
                 <div className="ready-section">
                   <div className="ready-message">Both players connected!</div>
+                  {/* Debug info */}
+                  <div style={{fontSize: '12px', color: '#666', margin: '10px 0'}}>
+                    Debug: creatorPubkey={creatorPubkey?.slice(0,8)}..., currentPubkey={pubkeyRef.current?.slice(0,8)}..., isRoomCreator={isRoomCreator.toString()}
+                  </div>
                   {isRoomCreator ? ( 
                     <button 
                       onClick={startGameRound}
