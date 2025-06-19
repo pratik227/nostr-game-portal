@@ -25,6 +25,7 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
   const secretKeyRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const hasReceivedGameStateRef = useRef(false);
 
   // Game Logic State
   const [board, setBoard] = useState(Array(9).fill(null));
@@ -212,6 +213,9 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       const incomingState = JSON.parse(event.content);
       
       if (incomingState.version > gameStateVersion) {
+        console.log('Received game state:', incomingState);
+        hasReceivedGameStateRef.current = true;
+        
         setBoard(incomingState.board);
         setCurrentPlayer(incomingState.currentPlayer);
         setWinner(incomingState.winner);
@@ -311,37 +315,55 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       setGameStarted(true);
       showToast('Connected to game room!', 'success');
       
-      // Wait a bit to see if there's an existing game state
-      // If not, we'll be the room creator and Player X
-      setTimeout(() => {
-        if (!playerX && !playerO && !creatorPubkey) {
-          // No existing players, we're the first/creator
-          console.log('Becoming room creator:', pubkeyRef.current);
-          setPlayerX(pubkeyRef.current);
-          setCreatorPubkey(pubkeyRef.current);
-          setGameStateVersion(1);
-          showToast('You joined as Player X!', 'success');
-          // Publish with explicit values instead of relying on state
-          setTimeout(() => {
-            publishGameStateWithValues({
-              board: Array(9).fill(null),
-              currentPlayer: 'X',
-              winner: null,
-              winningCells: [],
-              version: 1,
-              xWins: 0,
-              oWins: 0,
-              playerX: pubkeyRef.current,
-              playerO: null,
-              gameReady: false,
-              creatorPubkey: pubkeyRef.current
-            });
-          }, 100);
-        } else {
-          console.log('Not becoming creator - existing state found:', { playerX, playerO, creatorPubkey });
+      // Use a more robust approach - check multiple times with shorter intervals
+      let checkCount = 0;
+      const maxChecks = 8; // Check 8 times over 2 seconds
+      
+      const checkForExistingGame = () => {
+        checkCount++;
+        console.log(`Check ${checkCount}: playerX=${playerX?.slice(0,8)}, playerO=${playerO?.slice(0,8)}, creatorPubkey=${creatorPubkey?.slice(0,8)}, hasReceivedGameState=${hasReceivedGameStateRef.current}`);
+        
+        // Stop checking if we've received any game state from the relay
+        if (hasReceivedGameStateRef.current) {
+          console.log('Received game state from relay - stopping creator checks');
+          return;
         }
-        // If there are existing players, handleGameEvent will handle joining
-      }, 800);
+        
+        if (!playerX && !playerO && !creatorPubkey) {
+          if (checkCount >= maxChecks) {
+            // After all checks, we're definitely the first player
+            console.log('Becoming room creator after', checkCount, 'checks:', pubkeyRef.current);
+            setPlayerX(pubkeyRef.current);
+            setCreatorPubkey(pubkeyRef.current);
+            setGameStateVersion(1);
+            showToast('You joined as Player X!', 'success');
+            // Publish with explicit values instead of relying on state
+            setTimeout(() => {
+              publishGameStateWithValues({
+                board: Array(9).fill(null),
+                currentPlayer: 'X',
+                winner: null,
+                winningCells: [],
+                version: 1,
+                xWins: 0,
+                oWins: 0,
+                playerX: pubkeyRef.current,
+                playerO: null,
+                gameReady: false,
+                creatorPubkey: pubkeyRef.current
+              });
+            }, 100);
+          } else {
+            // Check again in 250ms
+            setTimeout(checkForExistingGame, 250);
+          }
+        } else {
+          console.log('Found existing game state on check', checkCount, '- not becoming creator');
+        }
+      };
+      
+      // Start checking after 250ms
+      setTimeout(checkForExistingGame, 250);
       
     } catch (error) {
       console.error('Failed to start game:', error);
@@ -628,25 +650,21 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
               </div>
               
               {connectedPlayers === 2 ? ( 
-                <div className="ready-section">
-                  <div className="ready-message">Both players connected!</div>
-                  {/* Debug info */}
-                  <div style={{fontSize: '12px', color: '#666', margin: '10px 0'}}>
-                    Debug: creatorPubkey={creatorPubkey?.slice(0,8)}..., currentPubkey={pubkeyRef.current?.slice(0,8)}..., isRoomCreator={isRoomCreator.toString()}
+                                  <div className="ready-section">
+                    <div className="ready-message">Both players connected!</div>
+                    {isRoomCreator ? ( 
+                      <button 
+                        onClick={startGameRound}
+                        className="btn-primary"
+                      >
+                        Start Game
+                      </button>
+                    ) : (
+                      <div className="waiting-message"> 
+                        Waiting for room creator to start the game...
+                      </div>
+                    )}
                   </div>
-                  {isRoomCreator ? ( 
-                    <button 
-                      onClick={startGameRound}
-                      className="btn-primary"
-                    >
-                      Start Game
-                    </button>
-                  ) : (
-                    <div className="waiting-message"> 
-                      Waiting for room creator to start the game...
-                    </div>
-                  )}
-                </div>
               ) : (
                 <div className="need-more-players"> 
                   Need 1 more player to start
