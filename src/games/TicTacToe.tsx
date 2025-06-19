@@ -60,11 +60,7 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
     return count;
   }, [playerX, playerO]);
 
-  const isRoomCreator = useMemo(() => {
-    const result = creatorPubkey === pubkeyRef.current;
-    console.log('isRoomCreator check:', { creatorPubkey, currentPubkey: pubkeyRef.current, result });
-    return result;
-  }, [creatorPubkey]);
+  const isRoomCreator = useMemo(() => creatorPubkey === pubkeyRef.current, [creatorPubkey]);
 
   const getPlayerBySlot = useCallback((slot) => {
     return slot === 1 ? playerX : playerO;
@@ -375,7 +371,21 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
 
   // Game Logic Functions
   const startGameRound = useCallback(() => {
-    if (!isRoomCreator || connectedPlayers < 2) return;
+    console.log('startGameRound called:', { isRoomCreator, connectedPlayers, mySymbol, gameReady });
+    if (!isRoomCreator || connectedPlayers < 2) {
+      console.log('Cannot start game:', { isRoomCreator, connectedPlayers });
+      return;
+    }
+    
+    if (gameReady) {
+      console.log('Game already started, ignoring duplicate call');
+      return;
+    }
+    
+    console.log('Starting game round...');
+    
+    // Capture current values before state updates
+    const nextVersion = gameStateVersion + 1;
     
     setGameReady(true);
     setBoard(Array(9).fill(null));
@@ -383,15 +393,50 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
     setWinner(null);
     setWinningCells([]);
     setIsMyTurn(mySymbol === 'X');
-    setGameStateVersion(prev => prev + 1);
-    publishGameState();
+    setGameStateVersion(nextVersion);
+    
+    // Use explicit values for game start to ensure consistency
+    publishGameStateWithValues({
+      board: Array(9).fill(null),
+      currentPlayer: 'X',
+      winner: null,
+      winningCells: [],
+      version: nextVersion,
+      xWins: xWins,
+      oWins: oWins,
+      playerX: playerX,
+      playerO: playerO,
+      gameReady: true,
+      creatorPubkey: creatorPubkey
+    });
+    
     showToast('Game started!', 'success');
-  }, [isRoomCreator, connectedPlayers, mySymbol, publishGameState, showToast]);
+  }, [isRoomCreator, connectedPlayers, mySymbol, gameStateVersion, xWins, oWins, playerX, playerO, creatorPubkey, publishGameStateWithValues, showToast]);
 
   const makeMove = useCallback(async (index) => {
+    console.log('makeMove called:', { 
+      index, 
+      isMyTurn, 
+      cellOccupied: board[index], 
+      winner, 
+      isDraw, 
+      gameReady,
+      mySymbol,
+      currentPlayer 
+    });
+    
     if (!isMyTurn || board[index] || winner || isDraw || !gameReady) {
+      console.log('Move blocked:', { 
+        reason: !isMyTurn ? 'not my turn' : 
+                board[index] ? 'cell occupied' : 
+                winner ? 'game has winner' : 
+                isDraw ? 'game is draw' : 
+                !gameReady ? 'game not ready' : 'unknown'
+      });
       return;
     }
+    
+    console.log('Making move at index', index);
     
     // Make move locally
     const newBoard = [...board];
