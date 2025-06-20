@@ -539,6 +539,8 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
   }, [isMyTurn, board, winner, isDraw, gameReady, currentPlayer, gameStateVersion, xWins, oWins, playerX, playerO, creatorPubkey, publishGameStateWithValues]);
 
   const resetGame = useCallback(async () => {
+    const nextVersion = gameStateVersion + 1;
+    
     setBoard(Array(9).fill(null));
     setCurrentPlayer('X');
     setWinner(null);
@@ -554,11 +556,27 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       playerO: playerO?.slice(0, 8)
     });
     setIsMyTurn(currentMySymbol === 'X');
-    setGameStateVersion(prev => prev + 1);
+    setGameStateVersion(nextVersion);
     
-    await publishGameState();
+    // Publish explicit reset state values instead of current state
+    const resetStateToPublish = {
+      board: Array(9).fill(null),
+      currentPlayer: 'X',
+      winner: null,
+      winningCells: [],
+      version: nextVersion,
+      xWins: xWins,
+      oWins: oWins,
+      playerX: playerX,
+      playerO: playerO,
+      gameReady: gameReady,
+      creatorPubkey: creatorPubkey
+    };
+    
+    console.log('Publishing reset game state:', resetStateToPublish);
+    await publishGameStateWithValues(resetStateToPublish);
     showToast('New round started!', 'info');
-  }, [playerX, playerO, publishGameState, showToast]);
+  }, [playerX, playerO, gameStateVersion, xWins, oWins, gameReady, creatorPubkey, publishGameStateWithValues, showToast]);
 
   const leaveGame = useCallback(() => {
     if (subRef.current) subRef.current.close();
