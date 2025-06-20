@@ -505,10 +505,7 @@
   margin: 0 auto 32px auto;
 }
 
-.tic-tac-toe-board.locked {
-  pointer-events: none;
-  opacity: 0.7;
-}
+/* Removed board-level locking - now handled per cell */
 
 .board-cell {
   aspect-ratio: 1;

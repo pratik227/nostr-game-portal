@@ -46,6 +46,9 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
   const [connectionToastMessage, setConnectionToastMessage] = useState('');
   const [connectionToastType, setConnectionToastType] = useState('info');
   const [connectionToastIcon, setConnectionToastIcon] = useState(() => WifiIcon); // Use a function to set initial state
+  
+  // Add a ref to track when we last received a game state update
+  const lastGameStateUpdateRef = useRef(0);
 
   // Computed Properties (useMemo equivalents)
   const isDraw = useMemo(() =>
@@ -209,8 +212,9 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       const incomingState = JSON.parse(event.content);
       
       if (incomingState.version > gameStateVersion) {
-        console.log('Received game state:', incomingState);
+        console.log('Received game state:', incomingState, 'current version:', gameStateVersion);
         hasReceivedGameStateRef.current = true;
+        lastGameStateUpdateRef.current = Date.now();
         
         setBoard(incomingState.board);
         setCurrentPlayer(incomingState.currentPlayer);
@@ -243,11 +247,18 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
         }
         
         if (incomingState.gameReady) {
-          // Note: mySymbol needs to be calculated based on the updated state,
-          // or passed as a dependency if using an older version.
-          // For simplicity here, assuming mySymbol would react to updated playerX/O.
-          const currentMySymbol = (playerX === pubkeyRef.current ? 'X' : (playerO === pubkeyRef.current ? 'O' : null));
-          setIsMyTurn(incomingState.currentPlayer === currentMySymbol);
+          // Use the incoming state values to calculate the current player's symbol
+          const currentMySymbol = (incomingState.playerX === pubkeyRef.current ? 'X' : (incomingState.playerO === pubkeyRef.current ? 'O' : null));
+          const shouldBeMyTurn = incomingState.currentPlayer === currentMySymbol;
+          console.log('handleGameEvent setting isMyTurn:', {
+            currentPlayer: incomingState.currentPlayer,
+            currentMySymbol,
+            shouldBeMyTurn,
+            pubkey: pubkeyRef.current?.slice(0, 8),
+            playerX: incomingState.playerX?.slice(0, 8),
+            playerO: incomingState.playerO?.slice(0, 8)
+          });
+          setIsMyTurn(shouldBeMyTurn);
           if (event.pubkey !== pubkeyRef.current && !incomingState.winner && !isDraw) {
             showToast("Opponent moved - your turn!", 'info', 2000);
           }
@@ -392,7 +403,17 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
     setCurrentPlayer('X');
     setWinner(null);
     setWinningCells([]);
-    setIsMyTurn(mySymbol === 'X');
+    // Calculate isMyTurn based on current state values, not the mySymbol useMemo which may be stale
+    const currentMySymbol = (playerX === pubkeyRef.current ? 'X' : (playerO === pubkeyRef.current ? 'O' : null));
+    console.log('startGameRound setting isMyTurn:', {
+      currentMySymbol,
+      mySymbol,
+      shouldBeMyTurn: currentMySymbol === 'X',
+      pubkey: pubkeyRef.current?.slice(0, 8),
+      playerX: playerX?.slice(0, 8),
+      playerO: playerO?.slice(0, 8)
+    });
+    setIsMyTurn(currentMySymbol === 'X');
     setGameStateVersion(nextVersion);
     
     // Use explicit values for game start to ensure consistency
@@ -414,6 +435,9 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
   }, [isRoomCreator, connectedPlayers, mySymbol, gameStateVersion, xWins, oWins, playerX, playerO, creatorPubkey, publishGameStateWithValues, showToast]);
 
   const makeMove = useCallback(async (index) => {
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastGameStateUpdateRef.current;
+    
     console.log('makeMove called:', { 
       index, 
       isMyTurn, 
@@ -422,8 +446,18 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       isDraw, 
       gameReady,
       mySymbol,
-      currentPlayer 
+      currentPlayer,
+      pubkey: pubkeyRef.current?.slice(0, 8),
+      playerX: playerX?.slice(0, 8),
+      playerO: playerO?.slice(0, 8),
+      timeSinceLastUpdate
     });
+    
+    // Prevent moves too quickly after receiving a game state update (100ms buffer)
+    if (timeSinceLastUpdate < 100) {
+      console.log('Move blocked: too soon after game state update');
+      return;
+    }
     
     if (!isMyTurn || board[index] || winner || isDraw || !gameReady) {
       console.log('Move blocked:', { 
@@ -480,22 +514,51 @@ const TicTacToe = ({ onScoreUpdate, onGameOver }) => {
       setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
     }
     
-    // Update version and publish
-    setGameStateVersion(prev => prev + 1);
-    await publishGameState();
-  }, [isMyTurn, board, winner, isDraw, gameReady, currentPlayer, publishGameState]);
+    // Update version and publish with the new board state
+    const nextVersion = gameStateVersion + 1;
+    console.log('makeMove version update:', { current: gameStateVersion, nextVersion });
+    setGameStateVersion(nextVersion);
+    
+    // Use the updated values directly instead of waiting for state updates
+    const stateToPublish = {
+      board: newBoard,
+      currentPlayer: hasWinner ? currentPlayer : (currentPlayer === 'X' ? 'O' : 'X'),
+      winner: hasWinner ? (winningPattern.length > 0 ? newBoard[winningPattern[0]] : null) : null,
+      winningCells: hasWinner ? winningPattern : [],
+      version: nextVersion,
+      xWins: hasWinner && newBoard[winningPattern[0]] === 'X' ? xWins + 1 : xWins,
+      oWins: hasWinner && newBoard[winningPattern[0]] === 'O' ? oWins + 1 : oWins,
+      playerX: playerX,
+      playerO: playerO,
+      gameReady: gameReady,
+      creatorPubkey: creatorPubkey
+    };
+    
+    console.log('Publishing game state:', stateToPublish);
+    await publishGameStateWithValues(stateToPublish);
+  }, [isMyTurn, board, winner, isDraw, gameReady, currentPlayer, gameStateVersion, xWins, oWins, playerX, playerO, creatorPubkey, publishGameStateWithValues]);
 
   const resetGame = useCallback(async () => {
     setBoard(Array(9).fill(null));
     setCurrentPlayer('X');
     setWinner(null);
     setWinningCells([]);
-    setIsMyTurn(mySymbol === 'X');
+    // Calculate isMyTurn based on current state values, not the mySymbol useMemo which may be stale
+    const currentMySymbol = (playerX === pubkeyRef.current ? 'X' : (playerO === pubkeyRef.current ? 'O' : null));
+    console.log('resetGame setting isMyTurn:', {
+      currentMySymbol,
+      mySymbol,
+      shouldBeMyTurn: currentMySymbol === 'X',
+      pubkey: pubkeyRef.current?.slice(0, 8),
+      playerX: playerX?.slice(0, 8),
+      playerO: playerO?.slice(0, 8)
+    });
+    setIsMyTurn(currentMySymbol === 'X');
     setGameStateVersion(prev => prev + 1);
     
     await publishGameState();
     showToast('New round started!', 'info');
-  }, [mySymbol, publishGameState, showToast]);
+  }, [playerX, playerO, publishGameState, showToast]);
 
   const leaveGame = useCallback(() => {
     if (subRef.current) subRef.current.close();
